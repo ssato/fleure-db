@@ -54,7 +54,7 @@ def find_uixmlgz_path(repo, root=os.path.sep):
     uid = os.getuid()
     user = pwd.getpwuid(uid).pw_name
 
-    if os.path.exists("/etc/dnf"):
+    if fleure_db.utils.is_dnf_available():
         rcdir = "/var/cache/dnf/" if uid == 0 else "/var/tmp/dnf-{user}-*/"
     else:
         rcdir = "/var/cache/yum/*/*/{repo}/"

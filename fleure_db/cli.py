@@ -45,7 +45,7 @@ def make_parser():
     """
     tstamp = fleure_db.utils.timestamp()
     defaults = dict(conf=None, repos=[], outdir="out-{}".format(tstamp),
-                    root=os.path.sep, makecache=False, yum="dnf", verbosity=0)
+                    root=os.path.sep, makecache=False, verbosity=0)
     psr = argparse.ArgumentParser()
     psr.set_defaults(**defaults)
 
@@ -68,8 +68,6 @@ def make_parser():
                  "repos. If any repos are not given by this option, repos are "
                  "guess from data in RPM DBs automatically, and please not "
                  "that any other repos are disabled if this option was set.")
-    add_arg("-Y", "--yum",
-            help="Specify yum command to run [{yum}]".format(**defaults))
     add_arg("-v", "--verbose", action="count", dest="verbosity",
             help="Verbose mode")
     add_arg("-D", "--debug", action="store_const", dest="verbosity",
@@ -107,8 +105,7 @@ def main(argv=None):
 
     if args.makecache or args.subcmd == "makecache":
         vopt = "--verbose" if args.verbosity else "--quiet"
-        fleure_db.utils.make_cache(args.repos, [vopt], root=args.root,
-                                   yum_cmd=args.yum)
+        fleure_db.utils.make_cache(args.repos, [vopt], root=args.root)
     if args.subcmd == "create":
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
                                           root=args.root)

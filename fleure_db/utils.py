@@ -27,14 +27,21 @@ def timestamp(dtobj=False):
     return (dtobj if dtobj else datetime.datetime.now()).strftime("%F:%T")
 
 
-def make_cache(repos, options, root=os.path.sep, yum_cmd="dnf"):
+def is_dnf_available():
+    """Is dnf available instead of yum?
+    """
+    return os.path.exists("/etc/dnf")
+
+
+def make_cache(repos, options, root=os.path.sep):
     """
     :param repos: List of repo IDs
     :param options: List of options passed to dnf/yum command
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
-    :param yum_cmd: Command to run, 'yum' or 'dnf' [default]
+
     :raises: :class:`~subprocess.CalledProcessError` may be raised on failure
     """
+    yum_cmd = "/usr/bin/dnf" if is_dnf_available() else "/usr/bin/yum"
     ropts = itertools.chain.from_iterable(("--enablerepo", r) for r in repos)
     cmd = [yum_cmd, "makecache", "--installroot", os.path.abspath(root),
            "--disablerepo", "*"] + list(ropts) + options
