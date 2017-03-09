@@ -99,16 +99,13 @@ rm -rf $RPM_BUILD_ROOT
 %doc docs/build/html
 %endif
 %{python_sitelib}/*
-%{_sbindir}/fleure-db-makecache
 %{_bindir}/fleure-db
-%{_mandir}/*/*
 
 %if 0%{?with_python3}
 %files -n python3-%{pkgname}
 %defattr(644,root,root,755)
 %doc README.rst
 %{python3_sitelib}/*
-%attr(755,root,root) %{_sbindir}/py3-fleure-db-makecache
 %attr(755,root,root) %{_bindir}/py3-fleure-db
 %endif
 
