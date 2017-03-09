@@ -11,7 +11,7 @@ import sys
 curdir = os.getcwd()
 sys.path.append(curdir)
 
-PACKAGE = "fleure_db"
+PACKAGE = "fleure-db"
 VERSION = "0.1.0"
 SNAPSHOT_BUILD_MODE = False
 
