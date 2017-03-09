@@ -26,8 +26,9 @@ def list_files(tdir):
     return [f for f in glob(os.path.join(tdir, '*')) if os.path.isfile(f)]
 
 
-# TBD:
 data_files = [
+    ("/etc/fleure/db.d", list_files("data/conf/")),
+    ("/usr/lib/systemd/system/", list_files("data/systemd/")),
 ]
 
 
