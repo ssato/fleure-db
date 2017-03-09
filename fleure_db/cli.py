@@ -15,8 +15,10 @@ import os.path
 import os
 import sys
 
-import fleure_db.utils
+import anyconfig
+import fleure_db.globals
 import fleure_db.create
+import fleure_db.utils
 
 
 LOG = logging.getLogger(__name__)
@@ -26,16 +28,30 @@ LOG.setLevel(logging.INFO)
 _LOG_LEVELS = (logging.WARNING, logging.INFO, logging.DEBUG)
 
 
+def load_configuration(conf_path=fleure_db.globals.CONF_PATH):
+    """
+    :param conf_path: Configuration dir or file or glob files pattern
+    :return: Mapping object holding configurations
+    """
+    if os.path.isdir(conf_path):
+        conf_path = os.path.join(conf_path, "*")
+
+    return anyconfig.load(conf_path)
+
+
 def make_parser():
     """Parse arguments.
     """
     tstamp = fleure_db.utils.timestamp()
-    defaults = dict(repos=[], outdir="out-{}".format(tstamp), root=os.path.sep,
-                    makecache=False, yum="dnf", verbosity=0)
+    defaults = dict(conf=None, repos=[], outdir="out-{}".format(tstamp),
+                    root=os.path.sep, makecache=False, yum="dnf", verbosity=0)
     psr = argparse.ArgumentParser()
     psr.set_defaults(**defaults)
 
     add_arg = psr.add_argument
+    add_arg("-C", "--conf",
+            help="Specify configuration file[s] with a file or dir path or "
+                 "glob pattern [{conf}]".format(**defaults))
     add_arg("-M", "--makecache", action="store_true",
             help="Specify this if to make cache in advance")
     add_arg("-O", "--outdir",
@@ -51,7 +67,8 @@ def make_parser():
                  "repos. If any repos are not given by this option, repos are "
                  "guess from data in RPM DBs automatically, and please not "
                  "that any other repos are disabled if this option was set.")
-    add_arg("-Y", "--yum", help="Specify yum command to run [%default]")
+    add_arg("-Y", "--yum",
+            help="Specify yum command to run [{yum}]".format(**defaults))
     add_arg("-v", "--verbose", action="count", dest="verbosity",
             help="Verbose mode")
     add_arg("-D", "--debug", action="store_const", dest="verbosity",
@@ -72,6 +89,13 @@ def main(argv=None):
 
     LOG.setLevel(_LOG_LEVELS[args.verbosity])
 
+    if args.conf:
+        LOG.info("Load configuration from: %s", args.conf)
+        cnf = load_configuration(args.conf)
+        if cnf:
+            psr.set_defaults(**cnf)
+            args = psr.parse_args(argv)  # Re-parse args with new default.
+
     if not args.repos:
         psr.print_help()
         sys.exit(0)
@@ -80,10 +104,9 @@ def main(argv=None):
         os.makedirs(args.outdir)
 
     if args.makecache or args.subcmd == "makecache":
-        fleure_db.utils.make_cache(args.repos,
-                                   ["--verbose" if args.verbose else
-                                    "--quiet"],
-                                   root=args.root, yum_cmd=args.yum)
+        vopt = "--verbose" if args.verbosity else "--quiet"
+        fleure_db.utils.make_cache(args.repos, [vopt], root=args.root,
+                                   yum_cmd=args.yum)
     if args.subcmd == "create":
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
                                           root=args.root)
