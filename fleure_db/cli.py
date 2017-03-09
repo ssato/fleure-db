@@ -111,8 +111,7 @@ def main(argv=None):
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
                                           root=args.root)
     end = datetime.datetime.now()
-    tdelta = end - start
-    LOG.info("Ended: %d [h] %d [sec] elapsed.", tdelta.days, tdelta.seconds)
+    LOG.info("Ended: %s elapsed.", end - start)
 
 
 if __name__ == '__main__':
