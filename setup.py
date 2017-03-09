@@ -84,6 +84,8 @@ setup(name=PACKAGE,
       url="https://github.com/ssato/fleure-db",
       packages=["fleure_db"],
       include_package_data=True,
+      entry_points=open(os.path.join(os.curdir,
+                        "pkg/entry_points.txt")).read(),
       cmdclass=dict(srpm=SrpmCommand, rpm=RpmCommand),
       data_files=data_files)
 
