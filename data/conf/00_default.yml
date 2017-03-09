@@ -1,4 +1,5 @@
 root: /var/lib/fleure/db/in
+yum: dnf
 repos:
   - rhel-7-server-rpms
   - rhel-7-server-optional-rpms
