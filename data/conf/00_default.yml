@@ -1,0 +1,34 @@
+root: /var/lib/fleure/db/in
+repos:
+  - rhel-7-server-rpms
+  - rhel-7-server-optional-rpms
+  - rhel-7-server-extras-rpms
+  - rhel-ha-for-rhel-7-server-rpms
+  - rhel-rs-for-rhel-7-server-rpms
+  - rhel-6-server-rpms
+  - rhel-6-server-optional-rpms
+  - rhel-6-server-extras-rpms
+  - rhel-ha-for-rhel-6-server-rpms
+  - rhel-rs-for-rhel-6-server-rpms
+
+rpm_vendor: redhat
+
+errata_keywords:
+  - crash
+  - panic
+  - hang
+  - SEGV
+  - segmentation fault
+  - data corruption
+
+errata_pkeywords:
+  - kernel: []
+
+core_rpms:
+  - kernel
+  - glibc
+  - bash
+  - openssl
+  - zlib
+
+# vim:sw=2:ts=2:et:

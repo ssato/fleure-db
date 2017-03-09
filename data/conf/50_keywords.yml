@@ -1,0 +1,26 @@
+# Example of configuration customization:
+# 
+#errata_keywords:
+#  - crash
+#  - panic
+#  - hang
+#  - SEGV
+#  - segmentation fault
+#  - data corruption
+#
+#errata_pkeywords:
+#  kernel:
+#    - kvm
+#    - ixgbe
+#    - bnx2x
+#    - ext4
+#    - xfs
+#
+#core_rpms:
+#  - kernel
+#  - glibc
+#  - bash
+#  - openssl
+#  - zlib
+
+# vim:sw=2:ts=2:et:
