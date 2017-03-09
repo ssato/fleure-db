@@ -103,12 +103,37 @@ def load_uixmlgz(repo, outdir, root=os.path.sep):
         raise RuntimeError("Output dir '{}' is not a dir!".format(outdir))
 
     # Save parsed but not modified data.
-    jpath = os.path.join(outdir, repo, "updateinfo.json")
-    os.makedirs(os.path.dirname(jpath))
-    LOG.info("Saved: %s", jpath)
+    jpath = os.path.join(outdir, repo, "raw_updateinfo.json")
+    if not os.path.exists(os.path.dirname(jpath)):
+        os.makedirs(os.path.dirname(jpath))
+    LOG.info("Save json: %s", jpath)
     anyconfig.dump(uidata, jpath)
 
     return uidata["updates"]
+
+
+# Mapping of update type vs. int.
+_UTYPE_INT_MAP = dict(RHSA=0, RHBA=1, RHEA=2)
+
+
+def _int_from_update(adv, typemap=None):
+    """
+    :param adv:
+        Update ID (errata advisory), e.g. RHBA-2016:2423, RHSA-2016:2872
+    :return: Int represents unique update
+
+    >>> _int_from_update("RHBA-2016:2423")
+    1010201624230
+    >>> _int_from_update("RHSA-2016:2872")
+    1000201628720
+    """
+    if typemap is None:
+        typemap = _UTYPE_INT_MAP
+
+    (utype, serial) = adv.split('-')
+    (tid, (year, seq)) = (typemap.get(utype, len(typemap)), serial.split(':'))
+
+    return int("10{}0{}{}0".format(tid, year, seq))
 
 
 def _repo_and_pkgs_from_update(update, repo):
@@ -158,10 +183,11 @@ def _url_from_update(update):
     """
     refs = update["references"]
     if isinstance(refs, dict):
-        return _get_value(refs, "href")
+        return refs["reference"].get("href")
     elif isinstance(refs, list):
-        return _get_value(refs[0], "href")
+        return refs[0]["reference"].get(" href")
     else:
+        raise ValueError("refs=%r" % refs)
         return None  # It should not reach here although...
 
 
@@ -178,34 +204,23 @@ def load_updates_from_uixmlgz_itr(repo, outdir, root=os.path.sep):
         return
 
     for upd in (u["update"] for u in uidata):
+        # Swap uid["id"] with int.
+        uid = _int_from_update(upd["id"])
+        upd["advisory"] = upd["id"]
+        upd["id"] = uid
+
         # Modify some to simplify tables created later.
-        (upd["repo_id"], upd["repo_name"],
-         upd["pkgs"]) = _repo_and_pkgs_from_update(upd, repo)
+        (rid, rname, upd["pkgs"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
+        upd.setdefault("repos", [dict(repo_id=rid, repo_name=rname)])
 
         # Do I need to convert them?
         # :seealso: https://www.sqlite.org/datatype3.html
         # :seealso: https://www.sqlite.org/lang_datefunc.html
-        # for key in ("issued", "updated"):
-        #    upd[key] = _get_value(upd, key)
+        for key in ("issued", "updated"):
+            upd[key] = _get_value(upd, key)
 
-        yield upd
-
-
-def process_uixmlgzs_itr(repos, outdir, root=os.path.sep):
-    """
-    :param repos: A list of repo IDs, e.g. ['rhel-7-server-rpms']
-    :param outdir: Dir to save outputs
-    :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
-
-    :return: A generator to yield updatainfo data {id, title, issued, ...}
-    """
-    chain = itertools.chain.from_iterable
-    upsi = chain(load_updates_from_uixmlgz_itr(r, outdir, root=root)
-                 for r in repos)
-
-    for upd in upsi:
         yield upd
 
 
@@ -335,9 +350,6 @@ def save_uidata_to_sqlite(uidata, outdir):
             vals = [_get_value(upd, k) for k in ukeys]
             _insert_values(cur, "updates", ukeys, vals)
 
-            vals = [_get_value(upd, k) for k in repokeys]
-            _insert_values(cur, "update_repos", repokeys, vals)
-
             pkgs = upd["pkgs"]  # see :fun:`process_uixmlgzs_itr`
             for pkg in pkgs:
                 vals = tuple(pkg[k] for k in pkeys)
@@ -359,23 +371,92 @@ def save_uidata_to_sqlite(uidata, outdir):
                     _insert_values(cur, "update_refs", ("uid", "rid"),
                                    (upd["id"], ref["id"]))
             conn.commit()
+
+            repos = upd.get("repos", [])
+            if isinstance(repos, dict):
+                repos = [repos]
+
+            for repo in repos:
+                vals = [upd["id"]] + [repo[k] for k in repokeys if k != "id"]
+                _insert_values(cur, "update_repos", repokeys, vals)
+
         conn.commit()
 
     LOG.info("Save db: %s", dbpath)
 
 
-def convert_uixmlgzs(repos, outdir, root=os.path.sep):
+def convert_uixmlgz(repo, outdir, root=os.path.sep):
     """
-    :param repos: A list of Repo IDs, e.g. ['rhel-7-server-rpms']
+    Convert updateinfo.xml.gz per repo.
+
+    :param repo: Repo IDs, e.g. 'rhel-7-server-rpms'
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
-    :return: True if success and False if not
+    :return: Mapping object holding updateinfo data
     """
-    upsi = process_uixmlgzs_itr(repos, outdir, root=root)
+    upsi = load_updates_from_uixmlgz_itr(repo, outdir, root=root)
     uidata = dict(updates=sorted(upsi, key=operator.itemgetter("id")))
 
-    # 1. Save as JSON file.
-    anyconfig.dump(uidata, os.path.join(outdir, "updateinfo.json"))
+    routdir = os.path.join(outdir, repo)
+    if not os.path.exists(routdir):
+        os.makedirs(routdir)
+
+    # 1. Save modified updateinfo data as JSON file.
+    anyconfig.dump(uidata, os.path.join(routdir, "updateinfo.json"))
+
+    # 2. Convert and save SQLite database.
+    try:
+        save_uidata_to_sqlite(uidata, routdir)
+    except (AttributeError, KeyError):
+        raise
+
+    return uidata["updates"]
+
+
+def _updates_with_repos_merged(repos, outdir, root):
+    """
+    :param repos: List of Repo IDs, e.g. ['rhel-7-server-rpms']
+    :param outdir: Dir to save outputs
+    :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+    """
+    if not repos:
+        return []
+
+    # {Update ID: Update}
+    ups = dict((u["id"], u) for u in convert_uixmlgz(repos[0], outdir, root))
+
+    for repo in repos[1:]:
+        for upd in convert_uixmlgz(repo, outdir, root):
+            uid = upd["id"]
+            urepos = upd["repos"]  # {repo_id, repo_name}
+
+            if uid in ups:
+                for urepo in urepos:
+                    if urepo["repo_id"] not in ups[uid]["repos"]:
+                        ups[uid]["repos"].append(urepo)
+            else:
+                upd["repos"] = urepos
+                ups[uid] = upd
+
+    return sorted(ups.values(), key=operator.itemgetter("id"))
+
+
+def convert_uixmlgzs(repos, outdir, root=os.path.sep):
+    """
+    Convert updateinfo.xml.gz of given all repos.
+
+    :param repos: List of Repo IDs, e.g. ['rhel-7-server-rpms']
+    :param outdir: Dir to save outputs
+    :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+
+    :return: True if success and False if not
+    """
+    uidata = dict(updates=_updates_with_repos_merged(repos, outdir, root))
+
+    # 1. Save all repos' updateinfo data as JSON file again.
+    jpath = os.path.join(outdir, "updateinfo.json")
+    LOG.info("Save json: %s", jpath)
+    anyconfig.dump(uidata, jpath)
 
     # 2. Convert and save SQLite database.
     try:
