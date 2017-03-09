@@ -103,10 +103,10 @@ def load_uixmlgz(repo, outdir, root=os.path.sep):
         raise RuntimeError("Output dir '{}' is not a dir!".format(outdir))
 
     # Save parsed but not modified data.
-    jpath = os.path.join(outdir, repo, "raw_updateinfo.json")
+    jpath = os.path.join(outdir, repo, "updateinfo.json")
     if not os.path.exists(os.path.dirname(jpath)):
         os.makedirs(os.path.dirname(jpath))
-    LOG.info("Save json: %s", jpath)
+    LOG.info("saved: %s", jpath)
     anyconfig.dump(uidata, jpath)
 
     return uidata["updates"]
@@ -382,7 +382,7 @@ def save_uidata_to_sqlite(uidata, outdir):
 
         conn.commit()
 
-    LOG.info("Save db: %s", dbpath)
+    LOG.info("saved: %s", dbpath)
 
 
 def convert_uixmlgz(repo, outdir, root=os.path.sep):
@@ -402,7 +402,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
         os.makedirs(routdir)
 
     # 1. Save modified updateinfo data as JSON file.
-    anyconfig.dump(uidata, os.path.join(routdir, "updateinfo.json"))
+    anyconfig.dump(uidata, os.path.join(routdir, "updates.json"))
 
     # 2. Convert and save SQLite database.
     try:
@@ -455,7 +455,7 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep):
 
     # 1. Save all repos' updateinfo data as JSON file again.
     jpath = os.path.join(outdir, "updateinfo.json")
-    LOG.info("Save json: %s", jpath)
+    LOG.info("saved: %s", jpath)
     anyconfig.dump(uidata, jpath)
 
     # 2. Convert and save SQLite database.
