@@ -10,6 +10,7 @@
 from __future__ import absolute_import
 
 import argparse
+import datetime
 import logging
 import os.path
 import os
@@ -81,6 +82,7 @@ def make_parser():
 def main(argv=None):
     """Cli main.
     """
+    start = datetime.datetime.now()
     if argv is None:
         argv = sys.argv[1:]
 
@@ -110,6 +112,9 @@ def main(argv=None):
     if args.subcmd == "create":
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
                                           root=args.root)
+    end = datetime.datetime.now()
+    tdelta = end - start
+    LOG.info("Ended: %d [h] %d [sec] elapsed.", tdelta.days, tdelta.seconds)
 
 
 if __name__ == '__main__':
