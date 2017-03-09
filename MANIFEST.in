@@ -1,0 +1,7 @@
+include MANIFEST.in
+include README.rst
+include setup.py
+include pkg/*
+recursive-include fleure* *.py
+recursive-include data *.*
+#recursive-include data *.j2 *.yml *.po *.pot

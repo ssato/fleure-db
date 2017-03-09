@@ -1,0 +1,117 @@
+%{!?python_version: %global python_version %(%{__python} -c "import sys ; print sys.version[:3]")}
+%{!?python3_version: %global python3_version %(%{__python3} -c "import sys; sys.stdout.write(sys.version[:3])")}
+
+%if 0%{?fedora}
+%global with_python3 1
+%global with_doc 0
+%global with_extras 0
+%else
+%global with_python3 0
+%global with_doc 0
+%global with_extras 0
+%endif
+
+# disable debuginfo
+%define debug_package %{nil}
+%define pkgname fleure-db
+
+%define common_desc fleure-db is a utility to analyze updateinfo.xml provides updates \
+information for systems running RPM-based linux distributions such like RHEL \
+(primary target), CentOS and Fedora.
+
+Name:           %{pkgname}
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        An utility to analyze updateinfo data
+Group:          Development/Libraries
+License:        AGPLv3+ and GPLv3
+URL:            https://github.com/ssato/%{pkgname}
+Source0:        %{pkgname}-%{version}.tar.gz
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildArch:      noarch
+BuildRequires:  python-devel
+BuildRequires:  python-setuptools
+%if 0%{?with_doc}
+BuildRequires:  python-docutils
+BuildRequires:  python-sphinx
+BuildRequires:  make
+%endif
+Requires:       python-anyconfig
+Requires:       python-setuptools
+%if 0%{?with_python3}
+BuildRequires:  python3-devel
+BuildRequires:  python3-setuptools
+BuildRequires:  python3-PyYAML
+%endif
+
+%description
+%common_desc
+
+%if 0%{?with_python3}
+%package -n python3-%{pkgname}
+Summary:        Generic access to configuration files in some formats
+Group:          Development/Libraries
+Requires:       python3-PyYAML
+Requires:       python3-setuptools
+
+%description -n python3-%{pkgname}
+%{common_desc}
+%endif
+
+%prep
+%setup -q -n %{pkgname}-%{version}
+
+%if 0%{?with_python3}
+rm -rf %{py3dir}
+cp -a . %{py3dir}
+%endif
+
+%build
+%{__python} setup.py build
+%if 0%{?with_doc}
+make -C docs/ html
+%endif
+
+%if 0%{?with_python3}
+pushd %{py3dir}
+%{__python3} setup.py build
+popd
+%endif
+
+%install
+rm -rf $RPM_BUILD_ROOT
+
+%if 0%{?with_python3}
+pushd %{py3dir}
+%{__python3} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
+for x in $RPM_BUILD_ROOT{%{_bindir},%{_sbindir}}/*; do mv $x ${x%/*}/py3-${x##*/}; done
+popd
+%endif
+%{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+%defattr(-,root,root,-)
+%doc README.rst
+%if 0%{?with_doc}
+%doc docs/build/html
+%endif
+%{python_sitelib}/*
+%{_sbindir}/fleure-db-makecache
+%{_bindir}/fleure-db
+%{_mandir}/*/*
+
+%if 0%{?with_python3}
+%files -n python3-%{pkgname}
+%defattr(644,root,root,755)
+%doc README.rst
+%{python3_sitelib}/*
+%attr(755,root,root) %{_sbindir}/py3-fleure-db-makecache
+%attr(755,root,root) %{_bindir}/py3-fleure-db
+%endif
+
+%changelog
+* Thu Mar  9 2017 Satoru SATOH <ssato@redhat.com> - 0.1.0-1
+- Initial packaging

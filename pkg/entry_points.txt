@@ -1,0 +1,2 @@
+[console_scripts]
+fleure-db = fleure_db.cli:main
