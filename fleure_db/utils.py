@@ -14,6 +14,17 @@ import itertools
 import os.path
 import subprocess
 
+try:
+    chain_from_iterable = itertools.chain.from_iterable
+except AttributeError:
+    # Borrowed from library doc, 9.7.1 Itertools functions:
+    def _from_iterable(iterables):
+        for it in iterables:
+            for element in it:
+                yield element
+
+    chain_from_iterable = _from_iterable
+
 
 def timestamp(dtobj=False):
     """Generate timestamp, formatted date and time.
@@ -25,6 +36,27 @@ def timestamp(dtobj=False):
     '2017-03-09:11:45:09'
     """
     return (dtobj if dtobj else datetime.datetime.now()).strftime("%F:%T")
+
+
+def sgroupby(items, kfn, kfn2=None):
+    """
+    itertools.groupby + sorted
+
+    :param items: Iterable object, e.g. a list, a tuple, etc.
+    :param kfn: Key function to sort `items` and group it
+    :param kfn2: Key function to sort each group in result
+
+    :return: A generator to yield items in `items` grouped by `kf`
+
+    >>> from operator import itemgetter
+    >>> items = [(1, 2, 10), (3, 4, 2), (3, 2, 1), (1, 10, 5)]
+    >>> list(sgroupby(items, itemgetter(0)))
+    [[(1, 2, 10), (1, 10, 5)], [(3, 4, 2), (3, 2, 1)]]
+    >>> list(sgroupby(items, itemgetter(0), itemgetter(2)))
+    [[(1, 10, 5), (1, 2, 10)], [(3, 2, 1), (3, 4, 2)]]
+    """
+    return (list(g) if kfn2 is None else sorted(g, key=kfn2) for _k, g
+            in itertools.groupby(sorted(items, key=kfn), kfn))
 
 
 def is_dnf_available():
@@ -42,7 +74,7 @@ def make_cache(repos, options, root=os.path.sep):
     :raises: :class:`~subprocess.CalledProcessError` may be raised on failure
     """
     yum_cmd = "/usr/bin/dnf" if is_dnf_available() else "/usr/bin/yum"
-    ropts = itertools.chain.from_iterable(("--enablerepo", r) for r in repos)
+    ropts = chain_from_iterable(("--enablerepo", r) for r in repos)
     cmd = [yum_cmd, "makecache", "--installroot", os.path.abspath(root),
            "--disablerepo", "*"] + list(ropts) + options
     subprocess.check_call(cmd)
