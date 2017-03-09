@@ -36,13 +36,16 @@ BuildRequires:  python-docutils
 BuildRequires:  python-sphinx
 BuildRequires:  make
 %endif
-Requires:       python-anyconfig
-Requires:       python-setuptools
 %if 0%{?with_python3}
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-PyYAML
 %endif
+Requires:       python-anyconfig
+Requires:       python-setuptools
+Requires(post): systemd
+Requires(preun): systemd
+Requires(postun): systemd
 
 %description
 %common_desc
@@ -84,13 +87,19 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{?with_python3}
 pushd %{py3dir}
 %{__python3} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
-for x in $RPM_BUILD_ROOT{%{_bindir},%{_sbindir}}/*; do mv $x ${x%/*}/py3-${x##*/}; done
+for x in $RPM_BUILD_ROOT%{_bindir}/*; do mv $x ${x%/*}/py3-${x##*/}; done
 popd
 %endif
 %{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
 
-%clean
-rm -rf $RPM_BUILD_ROOT
+%post
+%systemd_post %{name}-makecache.service
+
+%postun
+%systemd_postun %{name}-makecache.service
+
+%preun
+%systemd_preun %{name}-makecache.service
 
 %files
 %defattr(-,root,root,-)
@@ -100,6 +109,10 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 %{python_sitelib}/*
 %{_bindir}/fleure-db
+#%%{_unitdir} causes an error...
+/usr/lib/systemd/system/*.*
+# These shoult not be edited by user so not %%config
+%{_sysconfdir}/fleure/db.d/*.yml
 
 %if 0%{?with_python3}
 %files -n python3-%{pkgname}
