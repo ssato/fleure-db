@@ -100,13 +100,14 @@ def main(argv=None):
         psr.print_help()
         sys.exit(0)
 
-    if not os.path.exists(args.outdir):
-        os.makedirs(args.outdir)
-
     if args.makecache or args.subcmd == "makecache":
         vopt = "--verbose" if args.verbosity else "--quiet"
         fleure_db.utils.make_cache(args.repos, [vopt], root=args.root)
+
     if args.subcmd == "create":
+        if not os.path.exists(args.outdir):
+            os.makedirs(args.outdir)
+
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
                                           root=args.root)
     end = datetime.datetime.now()
