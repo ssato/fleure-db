@@ -313,12 +313,9 @@ def _fetch_id_from_table(cur, name, keys, values, key):
     return _exec_sql_stmt(cur, stmt).fetchall()[0][0]
 
 
-def save_uidata_to_sqlite(uidata, outdir):
+def save_uidata_to_sqlite(updates, outdir):
     """
-    uidata:
-        {"updates": [{"update": {...}, ...]}
-
-    :param uidata: Updateinfo data (nested dict) to save
+    :param updates: List of updateinfo data (nested dict)
     :param outdir: Dir to save outputs
     """
     dbpath = os.path.join(outdir, "updateinfo.db")
@@ -359,7 +356,7 @@ def save_uidata_to_sqlite(uidata, outdir):
         conn.commit()
 
         # 2. Insert data
-        for upd in uidata["updates"]:
+        for upd in updates:
             vals = [_get_value(upd, k) for k in ukeys]
             _insert_values(cur, "updates", ukeys, vals)
 
@@ -407,20 +404,20 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
     :return: Mapping object holding updateinfo data
     """
-    upsi = load_updates_from_uixmlgz_itr(repo, outdir, root=root)
-    uidata = dict(updates=sorted(upsi, key=operator.itemgetter("id")))
+    ups = sorted(load_updates_from_uixmlgz_itr(repo, outdir, root=root),
+                 key=operator.itemgetter("id"))
     routdir = os.path.join(outdir, repo)
 
     # 1. Save modified updateinfo data as JSON file.
-    _save_data_as_json(uidata, os.path.join(routdir, "updates.json"))
+    _save_data_as_json(ups, os.path.join(routdir, "updates.json"))
 
     # 2. Convert and save SQLite database.
     try:
-        save_uidata_to_sqlite(uidata, routdir)
+        save_uidata_to_sqlite(ups, routdir)
     except (AttributeError, KeyError):
         raise
 
-    return uidata["updates"]
+    return ups
 
 
 def _updates_with_repos_merged(repos, outdir, root):
@@ -461,14 +458,14 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep):
 
     :return: True if success and False if not
     """
-    uidata = dict(updates=_updates_with_repos_merged(repos, outdir, root))
+    ups = _updates_with_repos_merged(repos, outdir, root)
 
     # 1. Save all repos' updateinfo data as JSON file again.
-    _save_data_as_json(uidata, os.path.join(outdir, "updateinfo.json"))
+    _save_data_as_json(ups, os.path.join(outdir, "updateinfo.json"))
 
     # 2. Convert and save SQLite database.
     try:
-        save_uidata_to_sqlite(uidata, outdir)
+        save_uidata_to_sqlite(ups, outdir)
     except (AttributeError, KeyError):
         raise
 
