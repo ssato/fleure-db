@@ -65,6 +65,24 @@ def find_uixmlgz_path(repo, root=os.path.sep):
     return paths[0] if paths else None  # Try the first one only.
 
 
+def _save_data_as_json(data, filepath, top_key="data"):
+    """
+    :param filepath: JSON file path
+    :param data: Data to save, maybe a list or mapping object
+    :para top_key:
+        Top level mapping key to be used to save list data (valid JSON data is
+        a mapping object)
+    """
+    if not hasattr(data, "keys"):
+        data = {top_key: data}  # Necessary to make `data` as valid JSON data.
+
+    if not os.path.exists(os.path.dirname(filepath)):
+        os.makedirs(os.path.dirname(filepath))
+
+    anyconfig.dump(data, filepath)
+    LOG.info("saved: %s", filepath)
+
+
 def load_uixmlgz(repo, outdir, root=os.path.sep):
     """
     :param repo: Repo ID, e.g. rhel-7-server-rpms (RH CDN)
@@ -103,11 +121,7 @@ def load_uixmlgz(repo, outdir, root=os.path.sep):
         raise RuntimeError("Output dir '{}' is not a dir!".format(outdir))
 
     # Save parsed but not modified data.
-    jpath = os.path.join(outdir, repo, "updateinfo.json")
-    if not os.path.exists(os.path.dirname(jpath)):
-        os.makedirs(os.path.dirname(jpath))
-    LOG.info("saved: %s", jpath)
-    anyconfig.dump(uidata, jpath)
+    _save_data_as_json(uidata, os.path.join(outdir, repo, "updateinfo.json"))
 
     return uidata["updates"]
 
@@ -401,7 +415,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
         os.makedirs(routdir)
 
     # 1. Save modified updateinfo data as JSON file.
-    anyconfig.dump(uidata, os.path.join(routdir, "updates.json"))
+    _save_data_as_json(uidata, os.path.join(outdir, repo, "updates.json"))
 
     # 2. Convert and save SQLite database.
     try:
@@ -453,9 +467,7 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep):
     uidata = dict(updates=_updates_with_repos_merged(repos, outdir, root))
 
     # 1. Save all repos' updateinfo data as JSON file again.
-    jpath = os.path.join(outdir, "updateinfo.json")
-    LOG.info("saved: %s", jpath)
-    anyconfig.dump(uidata, jpath)
+    _save_data_as_json(uidata, os.path.join(outdir, "updateinfo.json"))
 
     # 2. Convert and save SQLite database.
     try:
