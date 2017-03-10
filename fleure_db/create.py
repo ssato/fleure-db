@@ -320,9 +320,8 @@ def save_uidata_to_sqlite(uidata, outdir):
                  "reboot_suggested")  # optional: release, severity, ...
         repokeys = ("id", "repo_id", "repo_name")
 
-        _exec_sql_stmt(cur,
-                       _create_table_statement("packages", pkeys,
-                                               auto_id=True))
+        _exec_sql_stmt(cur, _create_table_statement("packages", pkeys,
+                                                    auto_id=True))
         _exec_sql_stmt(cur, _create_table_statement("refs", rkeys))
         _exec_sql_stmt(cur, _create_table_statement("updates", ukeys))
 
