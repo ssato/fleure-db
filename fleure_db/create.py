@@ -235,7 +235,15 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         (rid, rname, upd["pkgs"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
-        upd["repos"] = [dict(repo_id=rid, repo_name=rname)]
+        upd["repos"] = [dict(uid=uid, repo_id=rid, repo_name=rname)]
+
+        # drop self and other references and just keep cve and bugzilla refs.
+        refs = upd["references"]
+        if isinstance(refs, list):  # It has errata/rhbz references.
+            upd["references"] = [r["reference"] for r in refs
+                                 if "id" in r["reference"]]
+        else:
+            upd["references"] = []
 
         # Do I need to convert them?
         # :seealso: https://www.sqlite.org/datatype3.html
@@ -244,27 +252,6 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
             upd[key] = upd[key]["date"]  # Eliminate the intermidiate dict.
 
         yield upd
-
-
-def _create_table_statement(name, keys, auto_id=False):
-    """
-    :param name: Table name
-    :param keys: Keys
-    :param auto_id: Generate unique ID if True
-    :return: SQL statement to create a table
-    """
-    if auto_id:
-        params = ", ".join(k + " TEXT" for k in keys if k != "id")
-        stmt = ("CREATE TABLE IF NOT EXISTS '{}' "
-                "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "{}, UNIQUE(id))").format(name, params)
-    else:
-        params = ", ".join(k + (" TEXT PRIMARY KEY" if k == id else " TEXT")
-                           for k in keys)
-        stmt = ("CREATE TABLE IF NOT EXISTS '{}' "
-                "({}, UNIQUE(id))".format(name, params))
-
-    return stmt
 
 
 def _exec_sql_stmt(cur, stmt, values=None):
@@ -277,26 +264,73 @@ def _exec_sql_stmt(cur, stmt, values=None):
                 if values is None else cur.execute(stmt, values))
     except (sqlite3.OperationalError, sqlite3.IntegrityError,
             sqlite3.InterfaceError):
-        LOG.error("Could not execute: %s, %r", stmt, values)
+        LOG.error("Failed to exec: stmt=%s, values=%r", stmt, values)
         raise
 
 
-def _insert_values(cur, name, keys, values, auto_id=False):
+def _create_tbl_stmt(name, keys, pkey="id", pktype="INTEGER"):
+    """
+    :param name: Table name
+    :param keys: Keys
+    :param pkey: Primary key name
+    :param pktype: SQL type of primary key
+
+    :return: SQL statement to create a table
+    """
+    kts = ["{} {}".format(k, pktype + " PRIMARY KEY" if k == pkey else "TEXT")
+           for k in keys]
+    return "CREATE TABLE IF NOT EXISTS '{}' ({})".format(name, ", ".join(kts))
+
+
+_PKG_KEYS = ("id", "name", "version", "release", "epoch", "arch", "src")
+_REF_KEYS = ("id", "title", "type", "href")
+_UPD_KEYS = ("id", "type", "title", "summary", "description", "solution",
+             "issued", "updated", "release", "severity", "url",
+             "reboot_suggested")  # optional: release, severity, ...
+_REPO_KEYS = ("id", "repo_id", "repo_name")
+
+
+def _create_tables(conn, pkeys=_PKG_KEYS, rkeys=_REF_KEYS, ukeys=_UPD_KEYS):
+    """
+    :param conn: An initialized instance of :class:`~sqlite3.Connection`
+    """
+    cur = conn.cursor()
+
+    _exec_sql_stmt(cur, _create_tbl_stmt("packages", pkeys))
+    _exec_sql_stmt(cur, _create_tbl_stmt("refs", rkeys, pktype="TEXT"))
+    _exec_sql_stmt(cur, _create_tbl_stmt("updates", ukeys))
+
+    _exec_sql_stmt(cur, "PRAGMA foreign_keys = ON")
+    conn.commit()
+
+    _exec_sql_stmt(cur,
+                   "CREATE TABLE IF NOT EXISTS update_packages "
+                   "(uid TEXT, pid INTEGER, "
+                   " FOREIGN KEY(uid) REFERENCES updates(id), "
+                   " FOREIGN KEY(pid) REFERENCES packages(id))")
+    _exec_sql_stmt(cur,
+                   "CREATE TABLE IF NOT EXISTS update_refs "
+                   "(uid TEXT, rid TEXT, "
+                   " FOREIGN KEY(uid) REFERENCES updates(id), "
+                   " FOREIGN KEY(rid) REFERENCES refs(id))")
+    _exec_sql_stmt(cur,
+                   "CREATE TABLE IF NOT EXISTS update_repos"
+                   "(uid TEXT, repo_id TEXT, repo_name TEXT, "
+                   " FOREIGN KEY(uid) REFERENCES updates(id))")
+    conn.commit()
+
+
+def _insert_values(cur, name, keys, values):
     """
     :param cur: :class:`sqlite3.Cursor` object
     :param name: Name of the table to insert data
     :param keys: Key names for values
     :param values:
         Values to insert. The order of items and the length are same as `key`.
-    :param auto_id: Generate unique ID if True and id was not given
     """
     if any(v is None for v in values):
         keys = [k for k, v in itertools.izip(keys, values) if v is not None]
         values = [v for v in values if v is not None]
-        stmt = ("INSERT OR IGNORE INTO {}({}) VALUES ({})"
-                "".format(name, ", ".join(keys),
-                          ", ".join("?" for v in values)))
-    elif auto_id:
         stmt = ("INSERT OR IGNORE INTO {}({}) VALUES ({})"
                 "".format(name, ", ".join(keys),
                           ", ".join("?" for v in values)))
@@ -307,21 +341,8 @@ def _insert_values(cur, name, keys, values, auto_id=False):
     _exec_sql_stmt(cur, stmt, values)
 
 
-def _fetch_id_from_table(cur, name, keys, values, key):
-    """
-    :param cur: :class:`sqlite3.Cursor` object
-    :param name: Name of the table to insert data
-    :param keys: Key names for values
-    :param values:
-        Values to insert. The order of items and the length are same as `key`.
-    :param key: Key name to fetch the value
-    """
-    pred = " AND ".join("{} = '{}'".format(*t) for t in zip(keys, values))
-    stmt = ("SELECT {} FROM {} WHERE {}".format(key, name, pred))
-    return _exec_sql_stmt(cur, stmt).fetchall()[0][0]
-
-
-def save_uidata_to_sqlite(updates, outdir):
+def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
+                          rkeys=_REF_KEYS, ukeys=_UPD_KEYS):
     """
     :param updates: List of updateinfo data (nested dict)
     :param outdir: Dir to save outputs
@@ -329,68 +350,30 @@ def save_uidata_to_sqlite(updates, outdir):
     dbpath = os.path.join(outdir, "updateinfo.db")
 
     with sqlite3.connect(dbpath) as conn:
+        _create_tables(conn)
         cur = conn.cursor()
 
-        # 1. Create tables
-        pkeys = ("id", "name", "version", "release", "epoch", "arch", "src")
-        rkeys = ("id", "title", "type", "href")
-        ukeys = ("id", "type", "title", "summary", "description", "solution",
-                 "issued", "updated", "release", "severity", "url",
-                 "reboot_suggested")  # optional: release, severity, ...
-        repokeys = ("id", "repo_id", "repo_name")
-
-        _exec_sql_stmt(cur, _create_table_statement("packages", pkeys))
-        _exec_sql_stmt(cur, _create_table_statement("refs", rkeys))
-        _exec_sql_stmt(cur, _create_table_statement("updates", ukeys))
-
-        _exec_sql_stmt(cur, "PRAGMA foreign_keys = ON")
-        conn.commit()
-
-        _exec_sql_stmt(cur,
-                       "CREATE TABLE IF NOT EXISTS update_packages "
-                       "(uid TEXT, pid INTEGER, "
-                       " FOREIGN KEY(uid) REFERENCES updates(id), "
-                       " FOREIGN KEY(pid) REFERENCES packages(id))")
-        _exec_sql_stmt(cur,
-                       "CREATE TABLE IF NOT EXISTS update_refs "
-                       "(uid TEXT, rid TEXT, "
-                       " FOREIGN KEY(uid) REFERENCES updates(id), "
-                       " FOREIGN KEY(rid) REFERENCES refs(id))")
-        _exec_sql_stmt(cur,
-                       "CREATE TABLE IF NOT EXISTS update_repos"
-                       "(uid TEXT, repo_id TEXT, repo_name TEXT, "
-                       " FOREIGN KEY(uid) REFERENCES updates(id))")
-        conn.commit()
-
-        # 2. Insert data
         for upd in updates:
             vals = [_get_value(upd, k) for k in ukeys]
             _insert_values(cur, "updates", ukeys, vals)
 
-            pkgs = upd["pkgs"]  # see :fun:`process_uixmlgzs_itr`
-            for pkg in pkgs:
+            # see :fun:`process_uixmlgzs_itr`
+            for pkg in upd.get("pkgs", []):
                 vals = tuple(pkg[k] for k in pkeys)
                 _insert_values(cur, "packages", pkeys, vals)
                 _insert_values(cur, "update_packages", ("uid", "pid"),
                                (upd["id"], pkg["id"]))
             conn.commit()
 
-            refs = upd.get("references", [])
-            if isinstance(refs, list):  # It has errata/rhbz references.
-                for ref in (r["reference"] for r in refs):
-                    if "id" not in ref:  # It's a self reference.
-                        continue
-                    vals = tuple(ref[k] for k in rkeys)
-                    _insert_values(cur, "refs", rkeys, vals)
-                    _insert_values(cur, "update_refs", ("uid", "rid"),
-                                   (upd["id"], ref["id"]))
+            for ref in upd.get("references", []):
+                vals = tuple(ref[k] for k in rkeys)
+                _insert_values(cur, "refs", rkeys, vals)
+                _insert_values(cur, "update_refs", ("uid", "rid"),
+                               (upd["id"], ref["id"]))
             conn.commit()
 
-            repos = upd.get("repos", [])
-            if isinstance(repos, dict):
-                repos = [repos]
-
-            for repo in repos:
+            repokeys = ("id", "repo_id", "repo_name")
+            for repo in upd.get("repos", []):
                 vals = [upd["id"]] + [repo[k] for k in repokeys if k != "id"]
                 _insert_values(cur, "update_repos", repokeys, vals)
 
