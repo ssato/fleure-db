@@ -233,7 +233,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         # :seealso: https://www.sqlite.org/datatype3.html
         # :seealso: https://www.sqlite.org/lang_datefunc.html
         for key in ("issued", "updated"):
-            upd[key] = _get_value(upd, key)
+            upd[key] = upd[key]["date"]  # Eliminate the intermidiate dict.
 
         yield upd
 
