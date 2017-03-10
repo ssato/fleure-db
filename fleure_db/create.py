@@ -386,7 +386,7 @@ def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
     :param updates: List of updateinfo data (nested dict)
     :param outdir: Dir to save outputs
     """
-    dbpath = os.path.join(outdir, "updateinfo.db")
+    dbpath = os.path.join(outdir, "updates.db")
 
     with sqlite3.connect(dbpath) as conn:
         _create_tables(conn)
