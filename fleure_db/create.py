@@ -169,8 +169,8 @@ def _repo_and_pkgs_from_update(update, repo):
         return (rid, rname, pkgs)
 
     except (KeyError, AttributeError):
-        LOG.error("Corrupt update info: %s", update.get("id", "Unknown!"))
-        raise
+        msg = "Corrupt update info: {}".format(update.get("id", "Unknown!"))
+        raise ValueError(msg)
 
 
 def _get_value(dic, key):
