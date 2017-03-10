@@ -16,15 +16,15 @@ import os.path
 import subprocess
 
 try:
-    chain_from_iterable = itertools.chain.from_iterable
+    CHAIN_FROM_ITR = itertools.chain.from_iterable
 except AttributeError:
     # Borrowed from library doc, 9.7.1 Itertools functions:
     def _from_iterable(iterables):
-        for it in iterables:
-            for element in it:
+        for itr in iterables:
+            for element in itr:
                 yield element
 
-    chain_from_iterable = _from_iterable
+    CHAIN_FROM_ITR = _from_iterable
 
 
 def timestamp(dtobj=False):
@@ -113,7 +113,7 @@ def make_cache(repos, options, root=os.path.sep):
     :raises: :class:`~subprocess.CalledProcessError` may be raised on failure
     """
     yum_cmd = "/usr/bin/dnf" if is_dnf_available() else "/usr/bin/yum"
-    ropts = chain_from_iterable(("--enablerepo", r) for r in repos)
+    ropts = CHAIN_FROM_ITR(("--enablerepo", r) for r in repos)
     cmd = [yum_cmd, "makecache", "--installroot", os.path.abspath(root),
            "--disablerepo", "*"] + list(ropts) + options
     subprocess.check_call(cmd)
