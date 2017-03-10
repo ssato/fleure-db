@@ -232,7 +232,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         upd["id"] = uid
 
         # Modify some to simplify tables created later.
-        (rid, rname, upd["pkgs"]) = _repo_and_pkgs_from_update(upd, repo)
+        (rid, rname, upd["pkglist"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
         upd["repos"] = [dict(uid=uid, repo_id=rid, repo_name=rname)]
@@ -358,7 +358,7 @@ def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
             _insert_values(cur, "updates", ukeys, vals)
 
             # see :fun:`process_uixmlgzs_itr`
-            for pkg in upd.get("pkgs", []):
+            for pkg in upd.get("pkglist", []):
                 vals = tuple(pkg[k] for k in pkeys)
                 _insert_values(cur, "packages", pkeys, vals)
                 _insert_values(cur, "update_packages", ("uid", "pid"),
