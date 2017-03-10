@@ -409,10 +409,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
     """
     upsi = load_updates_from_uixmlgz_itr(repo, outdir, root=root)
     uidata = dict(updates=sorted(upsi, key=operator.itemgetter("id")))
-
     routdir = os.path.join(outdir, repo)
-    if not os.path.exists(routdir):
-        os.makedirs(routdir)
 
     # 1. Save modified updateinfo data as JSON file.
     _save_data_as_json(uidata, os.path.join(routdir, "updates.json"))
