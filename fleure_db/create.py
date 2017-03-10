@@ -415,7 +415,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
         os.makedirs(routdir)
 
     # 1. Save modified updateinfo data as JSON file.
-    _save_data_as_json(uidata, os.path.join(outdir, repo, "updates.json"))
+    _save_data_as_json(uidata, os.path.join(routdir, "updates.json"))
 
     # 2. Convert and save SQLite database.
     try:
