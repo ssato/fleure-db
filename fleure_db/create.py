@@ -227,7 +227,7 @@ def load_updates_from_uixmlgz_itr(repo, outdir, root=os.path.sep):
         (rid, rname, upd["pkgs"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
-        upd.setdefault("repos", [dict(repo_id=rid, repo_name=rname)])
+        upd["repos"] = [dict(repo_id=rid, repo_name=rname)]
 
         # Do I need to convert them?
         # :seealso: https://www.sqlite.org/datatype3.html
