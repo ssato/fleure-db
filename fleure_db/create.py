@@ -205,7 +205,7 @@ def _url_from_update(update):
         return None  # It should not reach here although...
 
 
-def load_updates_from_uixmlgz_itr(repo, outdir, root=os.path.sep):
+def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
     """
     :param repo: Repo ID, e.g. rhel-7-server-rpms (RH CDN)
     :param outdir: Dir to save outputs
@@ -404,7 +404,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
     :return: Mapping object holding updateinfo data
     """
-    ups = sorted(load_updates_from_uixmlgz_itr(repo, outdir, root=root),
+    ups = sorted(process_uixmlgz_itr(repo, outdir, root=root),
                  key=operator.itemgetter("id"))
     routdir = os.path.join(outdir, repo)
 
