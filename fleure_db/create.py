@@ -211,7 +211,7 @@ def load_updates_from_uixmlgz_itr(repo, outdir, root=os.path.sep):
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
 
-    :return: [update :: dict]
+    :return: [dict], data will be modified to make post processing easier
     """
     uidata = load_uixmlgz(repo, outdir, root=root)
     if not uidata:

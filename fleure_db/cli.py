@@ -43,7 +43,7 @@ def load_configuration(conf_path=fleure_db.globals.CONF_PATH):
 def make_parser():
     """Parse arguments.
     """
-    tstamp = fleure_db.utils.timestamp()
+    tstamp = str(fleure_db.utils.timestamp()).replace(':', '_')
     defaults = dict(conf=None, repos=[], outdir="out-{}".format(tstamp),
                     root=os.path.sep, makecache=False, verbosity=0)
     psr = argparse.ArgumentParser()
