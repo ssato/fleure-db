@@ -61,22 +61,25 @@ def sgroupby(items, kfn, kfn2=None):
 
 
 _C_DIGITS = "0 1 2 3 4 5 6 7 8 9".split()
-_H2I_BASE = ord('a') - len(_C_DIGITS) - 1  # needed to skip digits.
+_H2I_BASE = ord('a') - len(_C_DIGITS)  # needed to skip digits.
 
 
 def _c2i(char):
     """
     :param char: a character of [:alnum:]
-    :return: force-converted int from given `char`
+    :return: force-converted int from given `char` as str with 0 padding
 
     >>> (_c2i('0'), _c2i('1'), _c2i('9'))
-    (0, 1, 9)
+    ('00', '01', '09')
     >>> _c2i('a')
-    11
+    '10'
     >>> _c2i('z')
-    36
+    '35'
     """
-    return int(char) if char in _C_DIGITS else ord(char) - _H2I_BASE
+    if char in _C_DIGITS:
+        return "0{}".format(char)
+    else:
+        return str(ord(char) - _H2I_BASE)
 
 
 def _hex2int(hstr):
