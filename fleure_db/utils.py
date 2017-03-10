@@ -87,7 +87,7 @@ def _hex2int(hstr):
 
     :param hstr: Hexdigest string only consists of chars of [:alnum:]
     """
-    return int(''.join("{:0>2}".format(_c2i(c)) for c in hstr))
+    return int(''.join(_c2i(c) for c in hstr))
 
 
 def gen_id_for_values(values):

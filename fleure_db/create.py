@@ -150,6 +150,9 @@ def _int_from_update(adv, typemap=None):
     return int("10{}0{}{}0".format(tid, year, seq))
 
 
+_NEVRA = operator.itemgetter(*"name epoch version release arch".split())
+
+
 def _repo_and_pkgs_from_update(update, repo):
     """
     :param update: Update info dict, {id, titile, ..., pkglist, ...}
@@ -166,7 +169,12 @@ def _repo_and_pkgs_from_update(update, repo):
             rname = pkc["name"]
             pkgs = [pkc["package"]] if "package" in pkc else []
 
-        return (rid, rname, pkgs)
+        pkgs_with_ids = []
+        for pkg in pkgs:
+            pkg["id"] = fleure_db.utils.gen_id_for_values(_NEVRA(pkg))
+            pkgs_with_ids.append(pkg)
+
+        return (rid, rname, pkgs_with_ids)
 
     except (KeyError, AttributeError):
         msg = "Corrupt update info: {}".format(update.get("id", "Unknown!"))
@@ -324,15 +332,14 @@ def save_uidata_to_sqlite(updates, outdir):
         cur = conn.cursor()
 
         # 1. Create tables
-        pkeys = ("name", "version", "release", "epoch", "arch", "src")
+        pkeys = ("id", "name", "version", "release", "epoch", "arch", "src")
         rkeys = ("id", "title", "type", "href")
         ukeys = ("id", "type", "title", "summary", "description", "solution",
                  "issued", "updated", "release", "severity", "url",
                  "reboot_suggested")  # optional: release, severity, ...
         repokeys = ("id", "repo_id", "repo_name")
 
-        _exec_sql_stmt(cur, _create_table_statement("packages", pkeys,
-                                                    auto_id=True))
+        _exec_sql_stmt(cur, _create_table_statement("packages", pkeys))
         _exec_sql_stmt(cur, _create_table_statement("refs", rkeys))
         _exec_sql_stmt(cur, _create_table_statement("updates", ukeys))
 
@@ -363,13 +370,10 @@ def save_uidata_to_sqlite(updates, outdir):
             pkgs = upd["pkgs"]  # see :fun:`process_uixmlgzs_itr`
             for pkg in pkgs:
                 vals = tuple(pkg[k] for k in pkeys)
-                _insert_values(cur, "packages", pkeys, vals, auto_id=True)
-                conn.commit()
-
-                pid = _fetch_id_from_table(cur, "packages", pkeys, vals, "id")
+                _insert_values(cur, "packages", pkeys, vals)
                 _insert_values(cur, "update_packages", ("uid", "pid"),
-                               (upd["id"], pid))
-                conn.commit()
+                               (upd["id"], pkg["id"]))
+            conn.commit()
 
             refs = upd.get("references", [])
             if isinstance(refs, list):  # It has errata/rhbz references.
