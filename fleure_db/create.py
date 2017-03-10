@@ -16,6 +16,7 @@ import logging
 import operator
 import os.path
 import os
+import re
 import pwd
 import sqlite3
 
@@ -213,6 +214,35 @@ def _url_from_update(update):
         return None  # It should not reach here although...
 
 
+_EURL_RE = re.compile(r"http://access.redhat.com/errata/(RH.A-\d{4}:\d+).html")
+
+
+def _process_refs_itr(refs):
+    """
+    :param ref: A list of mapping object, {reference: {href, type, id, title}}
+    :return: modified ref
+    """
+    if not refs or not isinstance(refs, list):
+        return  # There is only self ref. and no errata/rhbz references.
+
+    for ref in (r["reference"] for r in refs):
+        if any(k not in ref for k in ("id", "type")):
+            continue
+
+        if ref["type"] == "self" or ref["id"] == "classification":
+            continue  # Ignore and skip them.
+
+        if ref["type"] == "other":
+            m = _EURL_RE.match(ref["href"])
+            if m:  # That is, it's a cross ref to other errata.
+                adv = m.groups()[0]
+                ref["type"] = "errata"
+                ref["title"] = adv
+                ref["id"] = _int_from_update(adv)
+
+        yield ref
+
+
 def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
     """
     :param repo: Repo ID, e.g. rhel-7-server-rpms (RH CDN)
@@ -231,19 +261,14 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         upd["advisory"] = upd["id"]
         upd["id"] = uid
 
-        # Modify some to simplify tables created later.
+        # Modify some items to simplify tables to create later.
         (rid, rname, upd["pkglist"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
         upd["repos"] = [dict(uid=uid, repo_id=rid, repo_name=rname)]
 
         # drop self and other references and just keep cve and bugzilla refs.
-        refs = upd["references"]
-        if isinstance(refs, list):  # It has errata/rhbz references.
-            upd["references"] = [r["reference"] for r in refs
-                                 if "id" in r["reference"]]
-        else:
-            upd["references"] = []
+        upd["references"] = list(_process_refs_itr(upd.get("references", [])))
 
         # Do I need to convert them?
         # :seealso: https://www.sqlite.org/datatype3.html
@@ -341,6 +366,20 @@ def _insert_values(cur, name, keys, values):
     _exec_sql_stmt(cur, stmt, values)
 
 
+def _insert_list_values_with_rels(cur, data, items_key, tbl_info, rel_info):
+    """
+    :param cur: :class:`sqlite3.Cursor` object
+    """
+    (tbl, keys) = tbl_info
+    (rel_tbl, rel_keys) = rel_info
+
+    for item in data.get(items_key, []):
+        vals = tuple(item[k] for k in keys)
+        _insert_values(cur, tbl, keys, vals)
+        _insert_values(cur, rel_tbl, rel_keys, (data["id"], item["id"]))
+
+
+
 def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
                           rkeys=_REF_KEYS, ukeys=_UPD_KEYS):
     """
@@ -357,19 +396,15 @@ def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
             vals = [_get_value(upd, k) for k in ukeys]
             _insert_values(cur, "updates", ukeys, vals)
 
-            # see :fun:`process_uixmlgzs_itr`
-            for pkg in upd.get("pkglist", []):
-                vals = tuple(pkg[k] for k in pkeys)
-                _insert_values(cur, "packages", pkeys, vals)
-                _insert_values(cur, "update_packages", ("uid", "pid"),
-                               (upd["id"], pkg["id"]))
+            # see :fun:`process_uixmlgz_itr`
+            _insert_list_values_with_rels(conn, upd, "pkglist",
+                                          ("packages", pkeys),
+                                          ("update_packages", ("uid", "pid")))
             conn.commit()
 
-            for ref in upd.get("references", []):
-                vals = tuple(ref[k] for k in rkeys)
-                _insert_values(cur, "refs", rkeys, vals)
-                _insert_values(cur, "update_refs", ("uid", "rid"),
-                               (upd["id"], ref["id"]))
+            _insert_list_values_with_rels(conn, upd, "references",
+                                          ("refs", rkeys),
+                                          ("update_refs", ("uid", "rid")))
             conn.commit()
 
             repokeys = ("id", "repo_id", "repo_name")
