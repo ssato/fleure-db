@@ -65,27 +65,4 @@ _ = gettext.translation(domain=PACKAGE,
                                                "locale"),
                         fallback=True).ugettext
 
-
-def rpm_list_path(workdir, filename="packages.json"):
-    """
-    :param workdir: Working dir to dump the result
-    :param filename: Output file basename
-    """
-    return os.path.join(workdir, filename)
-
-
-def errata_list_path(workdir, filename="errata.json"):
-    """
-    :param workdir: Working dir to dump the result
-    :param filename: Output file basename
-    """
-    return os.path.join(workdir, filename)
-
-
-def updates_list_path(workdir, filename="updates.json"):
-    """
-    :param workdir: Working dir to dump the result
-    """
-    return os.path.join(workdir, filename)
-
 # vim:sw=4:ts=4:et:
