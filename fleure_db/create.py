@@ -294,6 +294,8 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep, **options):
 
         # drop self and other references and just keep cve and bugzilla refs.
         upd["references"] = list(_process_refs_itr(upd.get("references", [])))
+        upd["cves"] = [r for r in upd["references"] if r["type"] == "cve"]
+        upd["bzs"] = [r for r in upd["references"] if r["type"] == "bugzilla"]
 
         # Do I need to convert them?
         # :seealso: https://www.sqlite.org/datatype3.html
