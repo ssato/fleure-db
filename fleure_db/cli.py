@@ -22,14 +22,14 @@ import fleure_db.create
 import fleure_db.utils
 
 
-LOG = logging.getLogger(__name__)
+LOG = logging.getLogger(fleure_db.globals.PACKAGE + ".cli")
 LOG.addHandler(logging.StreamHandler())
 LOG.setLevel(logging.INFO)
 
 _LOG_LEVELS = (logging.WARNING, logging.INFO, logging.DEBUG)
 
 
-def load_configuration(conf_path=fleure_db.globals.CONF_PATH):
+def load_configuration(conf_path=fleure_db.globals.FLEURE_DB_SYSCONF):
     """
     :param conf_path: Configuration dir or file or glob files pattern
     :return: Mapping object holding configurations
@@ -45,7 +45,8 @@ def make_parser():
     """
     tstamp = str(fleure_db.utils.timestamp()).replace(':', '_')
     defaults = dict(conf=None, repos=[], outdir="out-{}".format(tstamp),
-                    root=os.path.sep, makecache=False, verbosity=0)
+                    root=os.path.sep, makecache=False, analyze=False,
+                    verbosity=0)
     psr = argparse.ArgumentParser()
     psr.set_defaults(**defaults)
 
@@ -55,6 +56,8 @@ def make_parser():
                  "glob pattern [{conf}]".format(**defaults))
     add_arg("-M", "--makecache", action="store_true",
             help="Specify this if to make cache in advance")
+    add_arg("-A", "--analyze", action="store_true",
+            help="Do some exntended analysis also")
     add_arg("-O", "--outdir",
             help="Dir to save outputs. Created if not exist. "
                  "[{outdir}]".format(**defaults))
@@ -109,7 +112,8 @@ def main(argv=None):
             os.makedirs(args.outdir)
 
         fleure_db.create.convert_uixmlgzs(args.repos, args.outdir,
-                                          root=args.root)
+                                          root=args.root,
+                                          analyze=args.analyze)
     end = datetime.datetime.now()
     LOG.info("Ended: %s elapsed.", end - start)
 
