@@ -21,6 +21,7 @@ import pwd
 import sqlite3
 
 import anyconfig
+import fleure_db.analysis
 import fleure_db.utils
 
 
@@ -81,7 +82,7 @@ def _save_data_as_json(data, filepath, top_key="data"):
         os.makedirs(os.path.dirname(filepath))
 
     anyconfig.dump(data, filepath)
-    LOG.info("saved: %s", filepath)
+    LOG.debug("saved: %s", filepath)
 
 
 def load_uixmlgz(repo, outdir, root=os.path.sep):
@@ -158,6 +159,7 @@ def _repo_and_pkgs_from_update(update, repo):
     """
     :param update: Update info dict, {id, titile, ..., pkglist, ...}
     :param repo: Repo IDs, e.g. 'rhel-7-server-rpms'
+
     :return: A tuple of (repo_id :: str, repo_name :: str, [package :: dict])
     """
     try:
@@ -243,11 +245,12 @@ def _process_refs_itr(refs):
         yield ref
 
 
-def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
+def process_uixmlgz_itr(repo, outdir, root=os.path.sep, **options):
     """
     :param repo: Repo ID, e.g. rhel-7-server-rpms (RH CDN)
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+    :param options: Extra keyword options
 
     :return: [dict], data will be modified to make post processing easier
     """
@@ -261,7 +264,8 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         upd["advisory"] = upd["id"]
         upd["id"] = uid
 
-        # Modify some items to simplify tables to create later.
+        # Unify types of items and eliminate intermediate dicts to simplify
+        # analysis and creating tables later.
         (rid, rname, upd["pkglist"]) = _repo_and_pkgs_from_update(upd, repo)
 
         upd["url"] = _url_from_update(upd)
@@ -274,7 +278,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep):
         # :seealso: https://www.sqlite.org/datatype3.html
         # :seealso: https://www.sqlite.org/lang_datefunc.html
         for key in ("issued", "updated"):
-            upd[key] = upd[key]["date"]  # Eliminate the intermidiate dict.
+            upd[key] = upd[key]["date"]  # Eliminate intermediate dicts.
 
         yield upd
 
@@ -379,7 +383,6 @@ def _insert_list_values_with_rels(cur, data, items_key, tbl_info, rel_info):
         _insert_values(cur, rel_tbl, rel_keys, (data["id"], item["id"]))
 
 
-
 def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
                           rkeys=_REF_KEYS, ukeys=_UPD_KEYS):
     """
@@ -414,19 +417,21 @@ def save_uidata_to_sqlite(updates, outdir, pkeys=_PKG_KEYS,
 
         conn.commit()
 
-    LOG.info("saved: %s", dbpath)
+    LOG.debug("saved: %s", dbpath)
 
 
-def convert_uixmlgz(repo, outdir, root=os.path.sep):
+def convert_uixmlgz(repo, outdir, root=os.path.sep, **options):
     """
     Convert updateinfo.xml.gz per repo.
 
     :param repo: Repo IDs, e.g. 'rhel-7-server-rpms'
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+    :param options: Extra keyword options
+
     :return: Mapping object holding updateinfo data
     """
-    ups = sorted(process_uixmlgz_itr(repo, outdir, root=root),
+    ups = sorted(process_uixmlgz_itr(repo, outdir, root=root, **options),
                  key=operator.itemgetter("id"))
     routdir = os.path.join(outdir, repo)
 
@@ -442,18 +447,20 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep):
     return ups
 
 
-def _updates_with_repos_merged(repos, outdir, root):
+def _merge_repos_data(repos, outdir, root, **options):
     """
     :param repos: List of Repo IDs, e.g. ['rhel-7-server-rpms']
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+    :param options: Extra keyword options such as tokenize
     """
     if not repos:
         return []
 
-    # {Update ID: Update}
+    # Initialize ups :: {Update ID: Update} for the first repo.
     ups = dict((u["id"], u) for u in convert_uixmlgz(repos[0], outdir, root))
 
+    # Process other repos' data.
     for repo in repos[1:]:
         for upd in convert_uixmlgz(repo, outdir, root):
             uid = upd["id"]
@@ -465,29 +472,40 @@ def _updates_with_repos_merged(repos, outdir, root):
                         ups[uid]["repos"].append(urepo)
             else:
                 upd["repos"] = urepos
+                if options.get("tokenize"):
+                    desc = upd["description"]
+                    upd["tokens"] = fleure_db.analysis.tokenize(desc)
+
                 ups[uid] = upd
 
     return sorted(ups.values(), key=operator.itemgetter("id"))
 
 
-def convert_uixmlgzs(repos, outdir, root=os.path.sep):
+def convert_uixmlgzs(repos, outdir, root=os.path.sep, **options):
     """
     Convert updateinfo.xml.gz of given all repos.
 
     :param repos: List of Repo IDs, e.g. ['rhel-7-server-rpms']
     :param outdir: Dir to save outputs
     :param root: Root dir in which cachdir, e.g. /var/cache/dnf/, exists
+    :param options: Extra keyword options
 
     :return: True if success and False if not
     """
-    ups = _updates_with_repos_merged(repos, outdir, root)
+    ups = _merge_repos_data(repos, outdir, root, **options)
 
-    # 1. Save all repos' updateinfo data as JSON file again.
-    _save_data_as_json(ups, os.path.join(outdir, "updateinfo.json"))
+    # 1. Save all repos' updates data as JSON file again.
+    _save_data_as_json(ups, os.path.join(outdir, "updates.json"))
+
+    if options.get("analyze", False):
+        texts = [u["description"] for u in ups]  # TODO: Might exhaust RAM.
+        fleure_db.analysis.make_word2vec_model(texts, outdir, **options)
+        fleure_db.analysis.make_topic_models(texts, outdir, **options)
 
     # 2. Convert and save SQLite database.
     try:
         save_uidata_to_sqlite(ups, outdir)
+        LOG.info("saved SQLite database in: %s", outdir)
     except (AttributeError, KeyError):
         raise
 
