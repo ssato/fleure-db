@@ -31,6 +31,7 @@ FLEURE_DB_SYSCONF = os.environ.get("FLEURE_SYSCONF", "/etc/fleure/db.d/*.*")
 
 
 # It may depends on the versions of rpm:
+ERRATA_TYPES = (RHSA, RHBA, RHEA) = ("security", "bug", "enhancement")
 ERRATA_KEYWORDS = ("crash", "panic", "hang", "SEGV", "segmentation fault",
                    "data corruption")
 ERRATA_PKEYWORDS = {}
