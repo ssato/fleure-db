@@ -13,6 +13,8 @@ import cython  # pylint: disable=unused-argument
 import gensim
 import itertools
 import logging
+import os.path
+import os
 import nltk
 import tablib
 
@@ -28,22 +30,19 @@ from fleure_db.utils import CHAIN_FROM_ITR
 LOG = logging.getLogger(__name__)
 STEMMER = nltk.PorterStemmer()
 
-
-def _default_stopwords():
-    """
-    .. note::
-       To run 'nltk.download()' is required to use nltk.corpus or built RPM w/
-       https://github.com/ssato/misc/blob/master/rpmspecs/python-nltk-data.spec
-       and install it in advance.
-    """
-    try:
-        return nltk.corpus.stopwords.words("english")
-    except LookupError as exc:
-        LOG.warn("Corpus data was not found. Try nltk.download() to get it.")
-        return []
+# .. note::
+#    To run 'nltk.download()' is required to use nltk.corpus or built RPM w/
+#    https://github.com/ssato/misc/blob/master/rpmspecs/python-nltk-data.spec
+#    and install it in advance.
+try:
+    _DEFAULT_STOPWORDS = tuple(nltk.corpus.stopwords.words("english"))
+except LookupError:
+    LOG.warn("Corpus data was not found. Try to install python-nltk-data or "
+             "run nltk.download() to install it.")
+    _DEFAULT_STOPWORDS = ()
 
 
-def tokenize(text, stemming=False, stopwords=None):
+def tokenize(text, stemming=False, stopwords=_DEFAULT_STOPWORDS):
     """
     :param text: A string represents a bit long text
     :param stemming: Stemming words if True
@@ -51,9 +50,6 @@ def tokenize(text, stemming=False, stopwords=None):
 
     :return: List of tokens (words), [str]
     """
-    if stopwords is None:
-        stopwords = _default_stopwords()
-
     if stemming:
         return [STEMMER.stem(w) for w in nltk.wordpunct_tokenize(text)
                 if w not in stopwords]
@@ -61,9 +57,10 @@ def tokenize(text, stemming=False, stopwords=None):
         return [w for w in nltk.wordpunct_tokenize(text) if w not in stopwords]
 
 
-def make_word2vec_model(texts, w2v_options, **options):
+def make_word2vec_model(texts, outdir, w2v_options, **options):
     """
     :param texts: Iterable yields text consists of sentences
+    :param outdir: Output dir to save results
     :param w2v_options: Mapping object represents keyword options passed to gen
     :param options: Keyword options
 
@@ -73,8 +70,61 @@ def make_word2vec_model(texts, w2v_options, **options):
     corpus = options.get("corpus", "tokenizers/punkt/english.pickle")
     tokenizer = nltk.data.load(corpus)
     sentences = CHAIN_FROM_ITR(tokenizer.tokenize(t) for t in texts)
+    model = gensim.models.Word2Vec(sentences, **w2v_options)
 
-    return gensim.models.Word2Vec(sentences, **w2v_options)
+    opath = os.path.join(outdir, "gensim.word2vec")
+    model.save(opath)
+    LOG.info("Saved word2vec data: %s", opath)
+
+    return model
+
+
+# :seealso: https://radimrehurek.com/gensim/tut1.html#corpus-formats
+# :seealso: https://radimrehurek.com/gensim/tut2.html
+def make_topic_models(texts, outdir, **options):
+    """
+    :param texts: Iterable yields text consists of sentences :: [str]
+    :param outdir: Output dir to save results and intermediate data
+    :param options: Extra keyword options
+
+    :return: {corpus, tfidf, lsi, lda}
+    """
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+        LOG.info("Created dir to save results: %s", outdir)
+
+    tokensets = [tokenize(t) for t in texts]  # [[str]]
+
+    dic = gensim.corpora.Dictionary(tokensets)
+    dicpath = os.path.join(outdir, "gensim.wordids")
+    dic.save(dicpath)
+    LOG.info("Saved corpora.Dictionary data: %s", dicpath)
+
+    corpus = [dic.doc2bow(tokens) for tokens in tokensets]
+    cpath = os.path.join(outdir, "gensim.mm")
+    gensim.corpora.MmCorpus.serialize(cpath, corpus)
+    LOG.info("Saved corpus data: %s", cpath)
+
+    tfidf = gensim.models.TfidfModel(corpus)
+    tpath = os.path.join(outdir, "gensim.tfidf")
+    tfidf.save(tpath)
+    LOG.info("Saved tfidf data: %s", tpath)
+
+    lsimod = gensim.models.lsimodel.LsiModel(tfidf[corpus], id2word=dic,
+                                             num_topics=300)
+    lsipath = os.path.join(outdir, "gensim.lsimodel")
+    lsimod.save(lsipath)
+    LOG.info("Saved LSI model: %s", lsipath)
+    LOG.debug("LSI model: topics = %r", lsimod.show_topics())
+
+    ldamod = gensim.models.ldamodel.LdaModel(corpus, id2word=dic,
+                                             num_topics=100)
+    ldapath = os.path.join(outdir, "gensim.ldamodel")
+    ldamod.save(ldapath)
+    LOG.info("Saved LDA model: %s", ldapath)
+    LOG.debug("LDA model: topics = %r", ldamod.show_topics())
+
+    return dict(corpus=corpus, tfidf=tfidf, lsi=lsimod, lda=ldamod)
 
 
 def list_latest_errata_by_updates(ers):
