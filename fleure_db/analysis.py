@@ -491,6 +491,7 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
                                     len(rpms) - len(updates))]))
 
     # TODO: Keep DRY principle.
+    rpmkeys = ("name", "epoch", "version", "release", "arch")
     lrpmkeys = [_("name"), _("epoch"), _("version"), _("release"), _("arch")]
 
     rpmdkeys = list(rpmkeys) # TODO: + ["summary", "vendor", "buildhost"]
