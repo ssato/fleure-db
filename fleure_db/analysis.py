@@ -504,7 +504,7 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
     lbekeys = (_("advisory"), _("keywords"), _("summary"), _("url"),
                _("pkgnames"))
 
-    mds = [mk_overview_dataset(data, **dargs),
+    mds = [mk_overview_dataset(data, **options),
            make_dataset((data["errata"]["rhsa"]["list_latest_critical"] +
                          data["errata"]["rhsa"]["list_latest_important"]),
                         _("Cri-Important RHSAs (latests)"), sekeys, lsekeys),
@@ -534,7 +534,7 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
             mds.append(make_dataset(data["installed"][key], title, rpmdkeys,
                                     lrpmdkeys))
 
-    dump_xls(mds, os.path.join(dumpdir, "errata_summary.xls"))
+    dump_xls(mds, os.path.join(outdir, "errata_summary.xls"))
 
     if details:
         dds = [make_dataset(errata, _("Errata Details"),
@@ -548,6 +548,6 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
                make_dataset(updates, _("Update RPMs"), rpmkeys, lrpmkeys),
                make_dataset(rpms, _("Installed RPMs"), rpmdkeys, lrpmdkeys)]
 
-        dump_xls(dds, os.path.join(dumpdir, "errata_details.xls"))
+        dump_xls(dds, os.path.join(outdir, "errata_details.xls"))
 
 # vim:sw=4:ts=4:et:
