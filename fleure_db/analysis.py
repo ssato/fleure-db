@@ -144,11 +144,11 @@ def list_updates_from_errata(ers):
     :param ers: List of mapping object represents update (errata)
     :return: List of latest udpate packages from errata
     """
-    ups = sorted(CHAIN_FROM_ITR(e.get("pkglist", []) for e in ers),
-                 itemgetter("name"))
+    ups = sorted((p for p in CHAIN_FROM_ITR(e.get("pkglist", []) for e in ers)),
+                 key=itemgetter("name", "arch"))
 
     return [sorted(g, cmp=fleure_db.utils.cmp_packages, reverse=True)[0] for g
-            in fleure_db.utils.sgroupby(ups, itemgetter("name"))]
+            in fleure_db.utils.sgroupby(ups, itemgetter("name", "arch"))]
 
 
 def _errata_keywords(names, keywords, pkeywords):
