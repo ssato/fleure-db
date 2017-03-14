@@ -530,6 +530,7 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep, **options):
         texts = [u["description"] for u in ups]  # TODO: Might exhaust RAM.
         fleure_db.analysis.make_word2vec_model(texts, outdir, **options)
         fleure_db.analysis.make_topic_models(texts, outdir, **options)
+        fleure_db.analysis.analyze_and_dump_results(ups, outdir)
 
     # 2. Convert and save SQLite database.
     try:
