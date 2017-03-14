@@ -22,8 +22,11 @@ import sqlite3
 
 import anyconfig
 import fleure_db.analysis
+import fleure_db.dates
 import fleure_db.globals
 import fleure_db.utils
+
+from fleure_db.analysis import analyze_and_dump_results
 
 
 LOG = logging.getLogger(__name__)
@@ -524,12 +527,19 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep, **options):
 
     # 1. Save all repos' updates data as JSON file again.
     _save_data_as_json(ups, os.path.join(outdir, "updates.json"))
+    ups_in_last_2_weeks = [u for u in ups
+                           if fleure_db.dates.in_last_x_weeks(u["issued"], 2)]
+    _save_data_as_json(ups_in_last_2_weeks,
+                       os.path.join(outdir, "updates_in_last_2_wks.json"))
 
+    sfn_2kws = "errata_summary_2_wks.xls"
     if options.get("analyze", False):
         texts = [u["description"] for u in ups]  # TODO: Might exhaust RAM.
         fleure_db.analysis.make_word2vec_model(texts, outdir, **options)
         fleure_db.analysis.make_topic_models(texts, outdir, **options)
-        fleure_db.analysis.analyze_and_dump_results(ups, outdir)
+        analyze_and_dump_results(ups, outdir)
+        analyze_and_dump_results(ups_in_last_2_weeks, outdir,
+                                 summary_filename=sfn_2kws)
 
     # 2. Convert and save SQLite database.
     try:
