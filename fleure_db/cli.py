@@ -22,7 +22,7 @@ import fleure_db.create
 import fleure_db.utils
 
 
-LOG = logging.getLogger(fleure_db.globals.PACKAGE + ".cli")
+LOG = logging.getLogger(fleure_db.globals.PACKAGE)
 LOG.addHandler(logging.StreamHandler())
 LOG.setLevel(logging.INFO)
 
@@ -75,7 +75,7 @@ def make_parser():
             help="Verbose mode")
     add_arg("-D", "--debug", action="store_const", dest="verbosity",
             const=2, help="Debug mode (same as -vv)")
-    add_arg("subcmd", choices=("makecache", "create"))
+    add_arg("subcmd")
 
     return psr
 
@@ -103,11 +103,11 @@ def main(argv=None):
         psr.print_help()
         sys.exit(0)
 
-    if args.makecache or args.subcmd == "makecache":
+    if args.makecache or args.subcmd.startswith("m"):  # makecache
         vopt = "--verbose" if args.verbosity else "--quiet"
         fleure_db.utils.make_cache(args.repos, [vopt], root=args.root)
 
-    if args.subcmd == "create":
+    if args.subcmd.startswith("c"):  # create
         if not os.path.exists(args.outdir):
             os.makedirs(args.outdir)
 
