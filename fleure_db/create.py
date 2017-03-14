@@ -229,12 +229,11 @@ def _url_from_update(update):
     """
     refs = update["references"]
     if isinstance(refs, dict):
-        return refs["reference"].get("href")
+        return refs["reference"]["href"]
     elif isinstance(refs, list):
-        return refs[0]["reference"].get(" href")
-    else:
-        raise ValueError("refs=%r" % refs)
-        return None  # It should not reach here although...
+        return refs[0]["reference"]["href"]
+
+    raise ValueError("refs=%r" % refs)
 
 
 _EURL_RE = re.compile(r"http://access.redhat.com/errata/(RH.A-\d{4}:\d+).html")
