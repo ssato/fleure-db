@@ -287,6 +287,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep, **options):
         # Unify types of items and eliminate intermediate dicts to simplify
         # analysis and creating tables later.
         (rid, rname, upd["pkglist"]) = _repo_and_pkgs_from_update(upd, repo)
+        upd["pkgnames"] = [p["name"] for p in upd["pkglist"]]
 
         upd["url"] = _url_from_update(upd)
         upd["repos"] = [dict(uid=uid, repo_id=rid, repo_name=rname)]
