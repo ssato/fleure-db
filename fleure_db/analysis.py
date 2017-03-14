@@ -57,7 +57,7 @@ def tokenize(text, stemming=False, stopwords=_DEFAULT_STOPWORDS):
         return [w for w in nltk.wordpunct_tokenize(text) if w not in stopwords]
 
 
-def make_word2vec_model(texts, outdir, w2v_options, **options):
+def make_word2vec_model(texts, outdir, w2v_options=None, **options):
     """
     :param texts: Iterable yields text consists of sentences
     :param outdir: Output dir to save results
@@ -70,7 +70,7 @@ def make_word2vec_model(texts, outdir, w2v_options, **options):
     corpus = options.get("corpus", "tokenizers/punkt/english.pickle")
     tokenizer = nltk.data.load(corpus)
     sentences = CHAIN_FROM_ITR(tokenizer.tokenize(t) for t in texts)
-    model = gensim.models.Word2Vec(sentences, **w2v_options)
+    model = gensim.models.Word2Vec(sentences, **(w2v_options or {}))
 
     opath = os.path.join(outdir, "gensim.word2vec")
     model.save(opath)
