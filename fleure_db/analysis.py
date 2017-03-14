@@ -81,10 +81,11 @@ def make_word2vec_model(texts, outdir, w2v_options=None, **options):
 
 # :seealso: https://radimrehurek.com/gensim/tut1.html#corpus-formats
 # :seealso: https://radimrehurek.com/gensim/tut2.html
-def make_topic_models(texts, outdir, **options):
+def make_topic_models(texts, outdir, ntopics=300, **options):
     """
     :param texts: Iterable yields text consists of sentences :: [str]
     :param outdir: Output dir to save results and intermediate data
+    :param ntopics: Number of topics to find out in topic models.
     :param options: Extra keyword options
 
     :return: {corpus, tfidf, lsi, lda}
@@ -111,14 +112,14 @@ def make_topic_models(texts, outdir, **options):
     LOG.info("Saved tfidf data: %s", tpath)
 
     lsimod = gensim.models.lsimodel.LsiModel(tfidf[corpus], id2word=dic,
-                                             num_topics=300)
+                                             num_topics=ntopics)
     lsipath = os.path.join(outdir, "gensim.lsimodel")
     lsimod.save(lsipath)
     LOG.info("Saved LSI model: %s", lsipath)
     LOG.debug("LSI model: topics = %r", lsimod.show_topics())
 
     ldamod = gensim.models.ldamodel.LdaModel(corpus, id2word=dic,
-                                             num_topics=100)
+                                             num_topics=ntopics)
     ldapath = os.path.join(outdir, "gensim.ldamodel")
     ldamod.save(ldapath)
     LOG.info("Saved LDA model: %s", ldapath)
