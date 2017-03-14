@@ -4,7 +4,7 @@
 # Copyright (C) 2013 - 2017 Red Hat, Inc.
 # License: AGPLv3+
 #
-# pylint: disable=no-member
+# pylint: disable=too-many-arguments,too-many-locals,no-member
 """Analysis module
 """
 from __future__ import absolute_import
@@ -23,8 +23,9 @@ from operator import itemgetter
 import fleure_db.globals
 import fleure_db.utils
 
-from fleure_db.globals import _
+from fleure_db.globals import _, RHSA, RHBA, RHEA
 from fleure_db.utils import CHAIN_FROM_ITR
+from fleure_db.datasets import make_dataset
 
 
 LOG = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ def list_latest_errata_by_updates(ers):
     """
     ung = lambda e: sorted(set(u["name"] for u in e.get("updates", [])))
     return [xs[-1] for xs
-            in fleure_db.utils.sgroupby(ers, ung, itemgetter("issue_date"))]
+            in fleure_db.utils.sgroupby(ers, ung, itemgetter("issued"))]
 
 
 def list_updates_from_errata(ers):
@@ -224,9 +225,9 @@ def errata_of_rpms_g(ers, rpms=fleure_db.globals.CORE_RPMS):
     :return: A generator to yield errata relevant to any of given RPM names
 
     >>> ert0 = dict(advisory="RHSA-2015:XXX1",
-    ...             update_names=["kernel", "tzdata"])
+    ...             pkgnames=["kernel", "tzdata"])
     >>> ert1 = dict(advisory="RHSA-2015:XXX2",
-    ...             update_names=["glibc", "tzdata"])
+    ...             pkgnames=["glibc", "tzdata"])
     >>> ers = errata_of_rpms_g([ert0, ert1], ("kernel", ))
     >>> ert0 in ers
     True
@@ -234,7 +235,7 @@ def errata_of_rpms_g(ers, rpms=fleure_db.globals.CORE_RPMS):
     False
     """
     for ert in ers:
-        if any(n in ert["update_names"] for n in rpms):
+        if any(n in ert["pkgnames"] for n in rpms):
             yield ert
 
 
@@ -244,9 +245,9 @@ def list_update_errata_pairs(ers):
     :return: A list of (update_name, [errata_advisory])
 
     >>> ers = [dict(advisory="RHSA-2015:XXX1",
-    ...             update_names=["kernel", "tzdata"]),
+    ...             pkgnames=["kernel", "tzdata"]),
     ...        dict(advisory="RHSA-2014:XXX2",
-    ...             update_names=["glibc", "tzdata"])
+    ...             pkgnames=["glibc", "tzdata"])
     ...        ]
     >>> list_update_errata_pairs(ers) == [
     ...     ('glibc', ['RHSA-2014:XXX2']),
@@ -269,11 +270,11 @@ def list_updates_by_num_of_errata(uess):
     :return: [(package_name :: str, num_of_relevant_errata :: Int)]
 
     >>> ers = [{'advisory': u'RHSA-2015:1623',
-    ...         'update_names': ['kernel-headers', 'kernel']},
+    ...         'pkgnames': ['kernel-headers', 'kernel']},
     ...        {'advisory': 'RHSA-2015:1513',
-    ...         'update_names': ['bind-utils']},
+    ...         'pkgnames': ['bind-utils']},
     ...        {'advisory': 'RHSA-2015:1081',
-    ...         'update_names': ['kernel-headers', 'kernel']}
+    ...         'pkgnames': ['kernel-headers', 'kernel']}
     ...        ]
     >>> list_updates_by_num_of_errata(list_update_errata_pairs(ers))
     [('kernel', 2), ('kernel-headers', 2), ('bind-utils', 1)]
@@ -331,15 +332,15 @@ def analyze_rhba(rhba, keywords=fleure_db.globals.ERRATA_KEYWORDS,
     :param core_rpms: Core RPMs to filter errata by them
     :return: RHSA analized data and metrics
     """
-    kfn = lambda e: (len(e.get("keywords", [])), e["issue_date"],
-                     e["update_names"])
+    kfn = lambda e: (len(e.get("keywords", [])), e["issued"],
+                     e["pkgnames"])
     rhba_by_kwds = sorted(errata_of_keywords_g(rhba, keywords, pkeywords),
                           key=kfn, reverse=True)
     rhba_of_core_rpms_by_kwds = \
         sorted(errata_of_rpms_g(rhba_by_kwds, core_rpms),
                key=kfn, reverse=True)
     rhba_of_rpms = sorted(errata_of_rpms_g(rhba, core_rpms),
-                          key=itemgetter("update_names"), reverse=True)
+                          key=itemgetter("pkgnames"), reverse=True)
     latest_rhba_of_rpms = list_latest_errata_by_updates(rhba_of_rpms)
     rhba_ues = list_update_errata_pairs(rhba)
 
@@ -353,82 +354,22 @@ def analyze_rhba(rhba, keywords=fleure_db.globals.ERRATA_KEYWORDS,
             'list_by_packages': rhba_ues}
 
 
-def _cve_socre_ge(cve, score=0, default=False):
-    """
-    :param cve: A dict contains CVE and CVSS info.
-    :param score: Lowest score to select CVEs (float). It's Set to 4.0 (PCIDSS
-        limit) by default:
-
-        * NVD Vulnerability Severity Ratings: http://nvd.nist.gov/cvss.cfm
-        * PCIDSS: https://www.pcisecuritystandards.org
-
-    :param default: Default value if failed to get CVSS score to compare with
-        given score
-
-    :return: True if given CVE's socre is greater or equal to given score.
-    """
-    if "score" not in cve:
-        LOG.warn(_("CVE %(cve)s lacks of CVSS base metrics and score"), cve)
-        return default
-    try:
-        return float(cve["score"]) >= float(score)
-    except (KeyError, ValueError):
-        LOG.warn(_("Failed to compare CVE's score: %s, score=%.1f"),
-                 str(cve), score)
-
-    return default
-
-
-def higher_score_cve_errata_g(ers, score=0):
-    """
-    :param ers: A list of errata
-    :param score: CVSS base metrics score
-    """
-    for ert in ers:
-        # NOTE: Skip older CVEs do not have CVSS base metrics and score.
-        cves = [c for c in ert.get("cves", []) if "score" in c]
-        if cves and any(_cve_socre_ge(cve, score) for cve in cves):
-            cvsses_s = ", ".join("{cve} ({score}, {metrics})".format(**c)
-                                 for c in cves)
-            cves_s = ", ".join("{cve} ({url})".format(**c) for c in cves)
-            ert["cvsses_s"] = cvsses_s
-            ert["cves_s"] = cves_s
-
-            yield ert
-
-
-def analyze_errata(ers, score=fleure_db.globals.CVSS_MIN_SCORE,
-                   keywords=fleure_db.globals.ERRATA_KEYWORDS,
+def analyze_errata(ers, keywords=fleure_db.globals.ERRATA_KEYWORDS,
                    pkeywords=None, core_rpms=fleure_db.globals.CORE_RPMS):
     """
     :param ers: A list of applicable errata sorted by severity
         if it's RHSA and advisory in ascending sequence
-    :param score: CVSS base metrics score
     :param keywords: A tuple of keywords to filter 'important' RHBAs
     :param pkeywords: Similar to above but a dict gives the list per RPMs
     :param core_rpms: Core RPMs to filter errata by them
     """
-    rhsa = [e for e in ers if e["advisory"][2] == 'S']
-    rhba = [e for e in ers if e["advisory"][2] == 'B']
-    rhea = [e for e in ers if e["advisory"][2] == 'E']
+    rhsa = [e for e in ers if e["type"] == RHSA]
+    rhba = [e for e in ers if e["type"] == RHBA]
+    rhea = [e for e in ers if e["type"] == RHEA]
 
     rhsa_data = analyze_rhsa(rhsa)
     rhba_data = analyze_rhba(rhba, keywords=keywords, pkeywords=pkeywords,
                              core_rpms=core_rpms)
-    if score > 0:
-        rhba_by_score = list(higher_score_cve_errata_g(rhba, score))
-        us_of_rhba_by_score = list_updates_from_errata(rhba_by_score)
-    else:
-        rhsa_by_score = []
-        rhba_by_score = []
-        us_of_rhsa_by_score = []
-        us_of_rhba_by_score = []
-
-    rhsa_data["list_higher_cvss_score"] = rhsa_by_score
-    rhba_data["list_higher_cvss_score"] = rhba_by_score
-    rhsa_data["list_higher_cvss_updates"] = us_of_rhsa_by_score
-    rhba_data["list_higher_cvss_updates"] = us_of_rhba_by_score
-
     return dict(rhsa=rhsa_data,
                 rhba=rhba_data,
                 rhea=dict(list=rhea,
@@ -450,12 +391,10 @@ def padding_row(row, mcols):
     return row + [''] * (mcols - len(row))
 
 
-def mk_overview_dataset(data, score=fleure_db.globals.CVSS_MIN_SCORE,
-                        keywords=fleure_db.globals.ERRATA_KEYWORDS,
+def mk_overview_dataset(data, keywords=fleure_db.globals.ERRATA_KEYWORDS,
                         core_rpms=None, **kwargs):
     """
     :param data: RPMs, Update RPMs and various errata data summarized
-    :param score: CVSS base metrics score limit
     :param keywords: A tuple of keywords to filter 'important' RHBAs
     :param core_rpms: Core RPMs to filter errata by them
 
@@ -489,18 +428,6 @@ def mk_overview_dataset(data, score=fleure_db.globals.CVSS_MIN_SCORE,
                  [_("# of RHBAs of core rpms (latests only)"),
                   len(data["errata"]["rhba"]["list_latests_of_core_rpms"])]]
 
-    if score > 0:
-        rows += [[],
-                 [_("RHSAs and RHBAs by CVSS score")],
-                 [_("# of RHSAs of CVSS Score >= %.1f") % score,
-                  len(data["errata"]["rhsa"]["list_higher_cvss_score"])],
-                 [_("# of Update RPMs by the above RHSAs at minimum"),
-                  len(data["errata"]["rhsa"]["list_higher_cvss_updates"])],
-                 [_("# of RHBAs of CVSS Score >= %.1f") % score,
-                  len(data["errata"]["rhba"]["list_higher_cvss_score"])],
-                 [_("# of Update RPMs by the above RHBAs at minimum"),
-                  len(data["errata"]["rhba"]["list_higher_cvss_updates"])]]
-
     rows += [[],
              [_("# of RHSAs"), len(data["errata"]["rhsa"]["list"])],
              [_("# of RHBAs"), len(data["errata"]["rhba"]["list"])],
@@ -528,5 +455,98 @@ def mk_overview_dataset(data, score=fleure_db.globals.CVSS_MIN_SCORE,
             dataset.append(padding_row(row, mcols))
 
     return dataset
+
+
+def dump_xls(dataset, filepath):
+    """XLS dump function"""
+    book = tablib.Databook(dataset)
+    with open(filepath, 'wb') as out:
+        out.write(book.xls)
+
+
+def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
+                             **options):
+    """
+    Analyze and dump package level static analysis results.
+
+    :param errata: List of mapping objects represents errata (update)
+    :param rpms: List of RPMs to select from `errata`
+    :param outdir: Dir to save results
+    """
+    installed = dict(list=rpms, list_rebuilt=[], list_replaced=[],
+                     list_from_others=[])
+    updates = []  # TBD.
+
+    for pkg in rpms:
+        for key in ("rebuilt", "replaced", "from_others"):
+            if pkg.get(key, False):
+                installed["list_" + key].append(pkg)
+
+    ers = analyze_errata(errata, **options)
+    data = dict(errata=ers,
+                installed=installed,
+                updates=dict(list=updates,
+                             rate=[(_("packages need updates"), len(updates)),
+                                   (_("packages not need updates"),
+                                    len(rpms) - len(updates))]))
+
+    # TODO: Keep DRY principle.
+    lrpmkeys = [_("name"), _("epoch"), _("version"), _("release"), _("arch")]
+
+    rpmdkeys = list(rpmkeys) # TODO: + ["summary", "vendor", "buildhost"]
+    lrpmdkeys = lrpmkeys # TODO: + [_("summary"), _("vendor"), _("buildhost")]
+
+    sekeys = ("advisory", "severity", "summary", "url", "pkgnames")
+    lsekeys = (_("advisory"), _("severity"), _("summary"), _("url"),
+               _("pkgnames"))
+    bekeys = ("advisory", "keywords", "summary", "url", "pkgnames")
+    lbekeys = (_("advisory"), _("keywords"), _("summary"), _("url"),
+               _("pkgnames"))
+
+    mds = [mk_overview_dataset(data, **dargs),
+           make_dataset((data["errata"]["rhsa"]["list_latest_critical"] +
+                         data["errata"]["rhsa"]["list_latest_important"]),
+                        _("Cri-Important RHSAs (latests)"), sekeys, lsekeys),
+           make_dataset(sorted(data["errata"]["rhsa"]["list_critical"],
+                               key=itemgetter("pkgnames")) +
+                        sorted(data["errata"]["rhsa"]["list_important"],
+                               key=itemgetter("pkgnames")),
+                        _("Critical or Important RHSAs"), sekeys, lsekeys),
+           make_dataset(data["errata"]["rhba"]["list_by_kwds_of_core_rpms"],
+                        _("RHBAs (core rpms, keywords)"), bekeys, lbekeys),
+           make_dataset(data["errata"]["rhba"]["list_by_kwds"],
+                        _("RHBAs (keyword)"), bekeys, lbekeys),
+           make_dataset(data["errata"]["rhba"]["list_latests_of_core_rpms"],
+                        _("RHBAs (core rpms, latests)"), bekeys, lbekeys),
+           make_dataset(data["errata"]["rhsa"]["list_critical_updates"],
+                        _("Update RPMs by RHSAs (Critical)"), rpmkeys,
+                        lrpmkeys),
+           make_dataset(data["errata"]["rhsa"]["list_important_updates"],
+                        _("Updates by RHSAs (Important)"), rpmkeys, lrpmkeys),
+           make_dataset(data["errata"]["rhba"]["list_updates_by_kwds"],
+                        _("Updates by RHBAs (Keyword)"), rpmkeys, lrpmkeys)]
+
+    for key, title in (("list_rebuilt", _("Rebuilt RPMs")),
+                       ("list_replaced", _("Replaced RPMs")),
+                       ("list_from_others", _("RPMs from other vendors"))):
+        if data["installed"][key]:
+            mds.append(make_dataset(data["installed"][key], title, rpmdkeys,
+                                    lrpmdkeys))
+
+    dump_xls(mds, os.path.join(dumpdir, "errata_summary.xls"))
+
+    if details:
+        dds = [make_dataset(errata, _("Errata Details"),
+                            ("advisory", "type", "severity", "summary",
+                             "description", "issued", "updated", "url",
+                             "cves", "bzs", "pkgnames"),
+                            (_("advisory"), _("type"), _("severity"),
+                             _("summary"), _("description"), _("issued"),
+                             _("updated"), _("url"), _("cves"),
+                             _("bzs"), _("pkgnames"))),
+               make_dataset(updates, _("Update RPMs"), rpmkeys, lrpmkeys),
+               make_dataset(rpms, _("Installed RPMs"), rpmdkeys, lrpmdkeys)]
+
+        dump_xls(dds, os.path.join(dumpdir, "errata_details.xls"))
 
 # vim:sw=4:ts=4:et:
