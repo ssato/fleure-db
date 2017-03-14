@@ -447,7 +447,7 @@ def convert_uixmlgz(repo, outdir, root=os.path.sep, **options):
     return ups
 
 
-def _merge_repos_data(repos, outdir, root, **options):
+def _load_and_merge_repos_data(repos, outdir, root, **options):
     """
     :param repos: List of Repo IDs, e.g. ['rhel-7-server-rpms']
     :param outdir: Dir to save outputs
@@ -492,7 +492,7 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep, **options):
 
     :return: True if success and False if not
     """
-    ups = _merge_repos_data(repos, outdir, root, **options)
+    ups = _load_and_merge_repos_data(repos, outdir, root, **options)
 
     # 1. Save all repos' updates data as JSON file again.
     _save_data_as_json(ups, os.path.join(outdir, "updates.json"))
