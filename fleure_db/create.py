@@ -459,6 +459,7 @@ def _load_and_merge_repos_data(repos, outdir, root, **options):
 
     # Initialize ups :: {Update ID: Update} for the first repo.
     ups = dict((u["id"], u) for u in convert_uixmlgz(repos[0], outdir, root))
+    LOG.info("Loaded first repo's data: repo=%s", repos[0])
 
     # Process other repos' data.
     for repo in repos[1:]:
@@ -478,6 +479,8 @@ def _load_and_merge_repos_data(repos, outdir, root, **options):
 
                 ups[uid] = upd
 
+        LOG.info("Loaded the repo's data: repo=%s", repo)
+
     return sorted(ups.values(), key=operator.itemgetter("id"))
 
 
@@ -492,6 +495,7 @@ def convert_uixmlgzs(repos, outdir, root=os.path.sep, **options):
 
     :return: True if success and False if not
     """
+    LOG.info("Start loading of repos' data")
     ups = _load_and_merge_repos_data(repos, outdir, root, **options)
 
     # 1. Save all repos' updates data as JSON file again.
