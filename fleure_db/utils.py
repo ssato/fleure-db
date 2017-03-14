@@ -12,6 +12,7 @@ from __future__ import absolute_import
 import datetime
 import hashlib
 import itertools
+import operator
 import os.path
 import subprocess
 
@@ -25,6 +26,23 @@ except AttributeError:
                 yield element
 
     CHAIN_FROM_ITR = _from_iterable
+
+try:
+    from yum import compareEVR as cmp_evrs
+except ImportError:
+    def cmp_evrs(evr0, evr1):
+        """Naive alternative implementation of yum.compareEVR by comparisons of
+        epochs, versions and releases in this order.
+
+        :param evr0, evr1: Tuples of (epoch, version, release)
+        """
+        (epoch0, ver0, rel0) = evr0
+        (epoch1, ver1, rel1) = evr1
+
+        if epoch0 == epoch1:
+            return cmp(rel0, rel1) if ver0 == ver1 else cmp(ver0, ver1)
+        else:
+            return cmp(epoch0, epoch1)
 
 
 def timestamp(dtobj=False):
@@ -105,6 +123,41 @@ def is_dnf_available():
     """Is dnf available instead of yum?
     """
     return os.path.exists("/etc/dnf")
+
+
+def _evr_from_package(pkg):
+    """
+    :return: Tuple of (epoch, version, release) of given package `pkg`
+    """
+    return operator.itemgetter("epoch", "version", "release")(pkg)
+
+
+def cmp_packages(pkg0, pkg1):
+    """
+    Compare versions of given packages `pkg0` and `pkg1`.
+
+    :param pkg0:
+        Mapping object represents package info has keys, name, epoch, version, release,
+        arch at least.
+    :param pkg1: Likewise
+    :return:
+        0 (verisons are same) or 1 (`pkg0` is newer than `pkg1`) or -1 (`pkg0`
+        is older than `pkg2`), or None with ValueError raised.
+    """
+    try:
+        if pkg0["name"] != pkg1["name"]:
+            raise ValueError("Compare versions of different packages! "
+                             "pkg0=%r, pkg1=%r" % (pkg0, pkg1))
+
+        if pkg0["arch"] != pkg1["arch"]:
+            raise ValueError("Compare versions of packages w/ different archs! "
+                             "pkg0=%r, pkg1=%r" % (pkg0, pkg1))
+
+        return cmp_evrs(_evr_from_package(pkg0), _evr_from_package(pkg1))
+
+    except (AttributeError, KeyError) as exc:
+        raise ValueError("Wrong pkg object were/was given! exc=%r,\n"
+                         "pkg0=%r, pkg1=%r" % (exc, pkg0, pkg1))
 
 
 def make_cache(repos, options, root=os.path.sep):
