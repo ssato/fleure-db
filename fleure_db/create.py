@@ -130,6 +130,8 @@ def load_uixmlgz(repo, outdir, root=os.path.sep):
 
 # Mapping of update type vs. int.
 _UTYPE_INT_MAP = dict(RHSA=0, RHBA=1, RHEA=2)
+_UTYPE_TYPE_MAP = {RHSA: fleure_db.globals.RHSA, RHBA: fleure_db.globals.RHBA,
+                   RHEA: fleure_db.globals.RHEA}
 
 
 def _int_from_update(adv, typemap=None):
@@ -150,6 +152,23 @@ def _int_from_update(adv, typemap=None):
     (tid, (year, seq)) = (typemap.get(utype, len(typemap)), serial.split(':'))
 
     return int("10{}0{}{}0".format(tid, year, seq))
+
+
+def _type_from_update(adv, typemap=None):
+    """
+    :param adv: Update ID (errata advisory), e.g. RHBA-2016:2423.
+    :return: Type string represents update's type
+
+    >>> _type_from_update("RHBA-2016:2423")
+    'bug'
+    >>> _type_from_update("RHSA-2016:2872")
+    'security'
+    """
+    if typemap is None:
+        typemap = _UTYPE_TYPE_MAP
+
+    utype = adv.split('-')[0]
+    return typemap[utype]
 
 
 _NEVRA = operator.itemgetter(*"name epoch version release arch".split())
@@ -263,6 +282,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep, **options):
         uid = _int_from_update(upd["id"])
         upd["advisory"] = upd["id"]
         upd["id"] = uid
+        upd["type"] = _type_from_update(upd["id"])
 
         # Unify types of items and eliminate intermediate dicts to simplify
         # analysis and creating tables later.
