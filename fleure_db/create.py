@@ -22,6 +22,7 @@ import sqlite3
 
 import anyconfig
 import fleure_db.analysis
+import fleure_db.globals
 import fleure_db.utils
 
 
@@ -130,8 +131,9 @@ def load_uixmlgz(repo, outdir, root=os.path.sep):
 
 # Mapping of update type vs. int.
 _UTYPE_INT_MAP = dict(RHSA=0, RHBA=1, RHEA=2)
-_UTYPE_TYPE_MAP = {RHSA: fleure_db.globals.RHSA, RHBA: fleure_db.globals.RHBA,
-                   RHEA: fleure_db.globals.RHEA}
+_UTYPE_TYPE_MAP = dict(RHSA=fleure_db.globals.RHSA,
+                       RHBA=fleure_db.globals.RHBA,
+                       RHEA=fleure_db.globals.RHEA)
 
 
 def _int_from_update(adv, typemap=None):
@@ -282,7 +284,7 @@ def process_uixmlgz_itr(repo, outdir, root=os.path.sep, **options):
         uid = _int_from_update(upd["id"])
         upd["advisory"] = upd["id"]
         upd["id"] = uid
-        upd["type"] = _type_from_update(upd["id"])
+        upd["type"] = _type_from_update(upd["advisory"])
 
         # Unify types of items and eliminate intermediate dicts to simplify
         # analysis and creating tables later.
