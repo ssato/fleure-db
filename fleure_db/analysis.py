@@ -465,6 +465,7 @@ def dump_xls(dataset, filepath):
 
 
 def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
+                             summary_filename="errata_summary.xls",
                              **options):
     """
     Analyze and dump package level static analysis results.
@@ -472,6 +473,7 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
     :param errata: List of mapping objects represents errata (update)
     :param rpms: List of RPMs to select from `errata`
     :param outdir: Dir to save results
+    :param summary_filename: Summary xls filename
     """
     installed = dict(list=rpms, list_rebuilt=[], list_replaced=[],
                      list_from_others=[])
@@ -534,7 +536,7 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
             mds.append(make_dataset(data["installed"][key], title, rpmdkeys,
                                     lrpmdkeys))
 
-    dump_xls(mds, os.path.join(outdir, "errata_summary.xls"))
+    dump_xls(mds, os.path.join(outdir, summary_filename))
 
     if details:
         dds = [make_dataset(errata, _("Errata Details"),
