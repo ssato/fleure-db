@@ -75,7 +75,7 @@ def make_parser():
             help="Verbose mode")
     add_arg("-D", "--debug", action="store_const", dest="verbosity",
             const=2, help="Debug mode (same as -vv)")
-    add_arg("subcmd")
+    add_arg("subcmd", help="Sub commands are m[akecache], c[reate]")
 
     return psr
 
