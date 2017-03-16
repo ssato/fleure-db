@@ -499,11 +499,11 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
     rpmdkeys = list(rpmkeys) # TODO: + ["summary", "vendor", "buildhost"]
     lrpmdkeys = lrpmkeys # TODO: + [_("summary"), _("vendor"), _("buildhost")]
 
-    sekeys = ("advisory", "severity", "summary", "url", "pkgnames")
-    lsekeys = (_("advisory"), _("severity"), _("summary"), _("url"),
+    sekeys = ("advisory", "severity", "title", "url", "pkgnames")
+    lsekeys = (_("advisory"), _("severity"), _("title"), _("url"),
                _("pkgnames"))
-    bekeys = ("advisory", "keywords", "summary", "url", "pkgnames")
-    lbekeys = (_("advisory"), _("keywords"), _("summary"), _("url"),
+    bekeys = ("advisory", "keywords", "title", "url", "pkgnames")
+    lbekeys = (_("advisory"), _("keywords"), _("title"), _("url"),
                _("pkgnames"))
 
     mds = [mk_overview_dataset(data, **options),
