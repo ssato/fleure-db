@@ -144,7 +144,8 @@ def list_updates_from_errata(ers):
     :param ers: List of mapping object represents update (errata)
     :return: List of latest udpate packages from errata
     """
-    ups = sorted((p for p in CHAIN_FROM_ITR(e.get("pkglist", []) for e in ers)),
+    ups = sorted((p for p in CHAIN_FROM_ITR(e.get("pkglist", [])
+                                            for e in ers)),
                  key=itemgetter("name", "arch"))
 
     return [sorted(g, cmp=fleure_db.utils.cmp_packages, reverse=True)[0] for g
@@ -496,8 +497,8 @@ def analyze_and_dump_results(errata, outdir, rpms=(), details=False,
     rpmkeys = ("name", "epoch", "version", "release", "arch")
     lrpmkeys = [_("name"), _("epoch"), _("version"), _("release"), _("arch")]
 
-    rpmdkeys = list(rpmkeys) # TODO: + ["summary", "vendor", "buildhost"]
-    lrpmdkeys = lrpmkeys # TODO: + [_("summary"), _("vendor"), _("buildhost")]
+    rpmdkeys = list(rpmkeys)  # TODO: + ["summary", "vendor", "buildhost"]
+    lrpmdkeys = lrpmkeys  # TODO: + [_("summary"), _("vendor"), _("buildhost")]
 
     sekeys = ("advisory", "severity", "title", "url", "pkgnames")
     lsekeys = (_("advisory"), _("severity"), _("title"), _("url"),
