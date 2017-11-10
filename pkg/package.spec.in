@@ -92,14 +92,14 @@ popd
 %endif
 %{__python} setup.py install -O1 --skip-build --root $RPM_BUILD_ROOT
 
-%post
-%systemd_post %{name}-makecache.service
-
-%postun
-%systemd_postun %{name}-makecache.service
-
-%preun
-%systemd_preun %{name}-makecache.service
+#%%post
+#%%systemd_post %{name}-makecache.service
+#
+#%%postun
+#%%systemd_postun %{name}-makecache.service
+#
+#%%preun
+#%%systemd_preun %{name}-makecache.service
 
 %files
 %defattr(-,root,root,-)
@@ -123,5 +123,8 @@ popd
 %endif
 
 %changelog
+* Fri Nov 10 2017 Satoru SATOH <ssato@redhat.com> - 0.1.0-2
+- disable scriptlets causes trouble until fix
+
 * Thu Mar  9 2017 Satoru SATOH <ssato@redhat.com> - 0.1.0-1
 - Initial packaging
