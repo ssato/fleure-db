@@ -46,6 +46,11 @@ Requires:       python-setuptools
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
+Requires:       python2-Cython
+Requires:       python-gensim-addons
+%if 0%{?with_python3}
+Requires:       python3-Cython
+%endif
 
 %description
 %common_desc
