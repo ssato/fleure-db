@@ -44,7 +44,7 @@ def find_uixmlgz_path(repo, root=os.path.sep):
       - dnf:
         - root: /var/cache/dnf/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
         - user:
-          /var/tmp/dnf-<user>-*/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
+          /var/cache/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
 
       where repo is repo id, e.g. "rhel-7-server-rpms"
             checksum is checksum of xml.gz file, e.g. 531b74...
@@ -61,14 +61,19 @@ def find_uixmlgz_path(repo, root=os.path.sep):
     user = pwd.getpwuid(uid).pw_name
 
     if fleure_db.utils.is_dnf_available():
-        rcdir = "/var/cache/dnf/" if uid == 0 else "/var/tmp/dnf-{user}-*/"
+        rcdir = "/var/cache/dnf/" if uid == 0 else "{root}/var/cache/"
     else:
         rcdir = "/var/cache/yum/*/*/{repo}/"
 
     pathf = os.path.join(rcdir, "{repo}-*/repodata/*-updateinfo.xml.gz")
     paths = sorted(glob.glob(pathf.format(repo=repo, root=root, user=user)),
                    key=os.path.getctime, reverse=True)
-    return paths[0] if paths else None  # Try the first one only.
+    if paths:
+        return paths[0]  # Try the first (latest) one only.
+    else:
+        LOG.warn("Tried pattern %s but failed to find updateinfo.xml.gz...", pathf)
+
+    return None
 
 
 def _save_data_as_json(data, filepath, top_key="data"):
