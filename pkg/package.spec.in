@@ -41,6 +41,10 @@ BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-PyYAML
 %endif
+# yum-utils is neede for yum-builddep in rhel.
+%if 0%{?rhel}
+BuildRequires:  yum-utils
+%endif
 Requires:       python-anyconfig
 Requires:       python-setuptools
 Requires(post): systemd
