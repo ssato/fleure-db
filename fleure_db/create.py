@@ -45,6 +45,7 @@ def find_uixmlgz_path(repo, root=os.path.sep):
         - root: /var/cache/dnf/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
         - user:
           /var/cache/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
+          /var/tmp/dnf-<username>-*/<repo>-*/repodata/<checksum>-updateinfo.xml.gz
 
       where repo is repo id, e.g. "rhel-7-server-rpms"
             checksum is checksum of xml.gz file, e.g. 531b74...
@@ -61,18 +62,21 @@ def find_uixmlgz_path(repo, root=os.path.sep):
     user = pwd.getpwuid(uid).pw_name
 
     if fleure_db.utils.is_dnf_available():
-        rcdir = "/var/cache/dnf/" if uid == 0 else "{root}/var/cache/"
+        _topdir = "/var/" if uid == 0 else "{root}/var/"
+        rcdirs = [os.path.join(_topdir, "tmp/dnf-*/"),
+                  os.path.join(_topdir, "cache/dnf/")]
     else:
-        rcdir = "/var/cache/yum/*/*/{repo}/"
+        rcdirs = ["/var/cache/yum/*/*/{repo}/"]
 
-    pathf = os.path.join(rcdir, "{repo}-*/repodata/*-updateinfo.xml.gz")
-    paths = sorted(glob.glob(pathf.format(repo=repo, root=root, user=user)),
-                   key=os.path.getctime, reverse=True)
-    if paths:
-        return paths[0]  # Try the first (latest) one only.
-    else:
-        LOG.warn("Tried pattern %s but failed to find updateinfo.xml.gz...", pathf)
+    for rcdir in rcdirs:
+        path = os.path.join(rcdir, "{repo}-*/repodata/*-updateinfo.xml.gz"
+                            ).format(repo=repo, root=root, user=user)
+        paths = sorted(glob.glob(path), key=os.path.getctime, reverse=True)
+        if paths:
+            return paths[0]  # Try the first (latest) one only.
 
+    LOG.warn("Tried to find updateinfo.xml.gz under %s but failed",
+             ", ".join(rcdirs))
     return None
 
 
