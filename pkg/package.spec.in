@@ -45,13 +45,13 @@ BuildRequires:  python3-PyYAML
 %if 0%{?rhel}
 BuildRequires:  yum-utils
 %endif
-Requires:       python-anyconfig
-Requires:       python-setuptools
+Requires:       python2-anyconfig
+Requires:       python2-setuptools
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 Requires:       python2-Cython
-Requires:       python-gensim-addons
+Requires:       python2-gensim-addons
 %if 0%{?with_python3}
 Requires:       python3-Cython
 %endif
