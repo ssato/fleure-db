@@ -51,6 +51,7 @@ Group:          Development/Libraries
 Requires:       python3-Cython
 Requires:       python3-PyYAML
 Requires:       python3-setuptools
+%{?python_provide:%python_provide python3-%{pkgname}}
 
 %description -n python3-%{pkgname}
 %{common_desc}
