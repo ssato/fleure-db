@@ -58,7 +58,7 @@ Requires:       python3-setuptools
 %endif
 
 %prep
-%setup -q -n %{pkgname}-%{version}
+%autosetup -n %{pkgname}-%{version}
 
 %build
 %py2_build
