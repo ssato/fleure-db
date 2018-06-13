@@ -6,10 +6,7 @@
 %bcond extras
 %endif
 
-# disable debuginfo
-%define debug_package %{nil}
 %define pkgname fleure-db
-
 %define common_desc fleure-db is a utility to analyze updateinfo.xml provides updates \
 information for systems running RPM-based linux distributions such like RHEL \
 (primary target), CentOS and Fedora.
