@@ -19,8 +19,8 @@ Group:          Development/Libraries
 License:        AGPLv3+ and GPLv3
 URL:            https://github.com/ssato/%{pkgname}
 Source0:        %{pkgname}-%{version}.tar.gz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
+
 BuildRequires:  python2-devel
 BuildRequires:  python2-setuptools
 %if %{with python3}
@@ -32,6 +32,7 @@ BuildRequires:  python3-PyYAML
 %if 0%{?rhel}
 BuildRequires:  yum-utils
 %endif
+
 Requires:       python2-anyconfig
 Requires:       python2-setuptools
 Requires(post): systemd
@@ -39,9 +40,6 @@ Requires(preun): systemd
 Requires(postun): systemd
 Requires:       python2-Cython
 Requires:       python2-gensim-addons
-%if %{with python3}
-Requires:       python3-Cython
-%endif
 
 %description
 %common_desc
@@ -50,6 +48,7 @@ Requires:       python3-Cython
 %package -n python3-%{pkgname}
 Summary:        Generic access to configuration files in some formats
 Group:          Development/Libraries
+Requires:       python3-Cython
 Requires:       python3-PyYAML
 Requires:       python3-setuptools
 
@@ -59,11 +58,6 @@ Requires:       python3-setuptools
 
 %prep
 %setup -q -n %{pkgname}-%{version}
-
-%if %{with python3}
-rm -rf %{py3dir}
-cp -a . %{py3dir}
-%endif
 
 %build
 %py2_build
@@ -98,7 +92,6 @@ cp -a . %{py3dir}
 
 %if %{with python3}
 %files -n python3-%{pkgname}
-%defattr(644,root,root,755)
 %doc README.rst
 %{python3_sitelib}/*
 %attr(755,root,root) %{_bindir}/fleure-db*
