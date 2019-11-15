@@ -1,6 +1,6 @@
 include MANIFEST.in
 include README.rst
-include setup.py
+include setup.*
 include pkg/*
 recursive-include fleure* *.py
 recursive-include data *.*

@@ -1,4 +1,4 @@
--r requirements_full.txt
+-r requirements.txt
 coveralls
 # disable this if 'pkg_resources.VersionConflict' error happens:
 flake8
