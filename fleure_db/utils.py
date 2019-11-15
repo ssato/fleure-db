@@ -27,22 +27,33 @@ except AttributeError:
 
     CHAIN_FROM_ITR = _from_iterable
 
-try:
-    from yum import compareEVR as cmp_evrs
-except ImportError:
-    def cmp_evrs(evr0, evr1):
-        """Naive alternative implementation of yum.compareEVR by comparisons of
-        epochs, versions and releases in this order.
 
-        :param evr0, evr1: Tuples of (epoch, version, release)
-        """
-        (epoch0, ver0, rel0) = evr0
-        (epoch1, ver1, rel1) = evr1
+def cmp(lhs, rhs):
+    """cmp function not in py3.
 
-        if epoch0 == epoch1:
-            return cmp(rel0, rel1) if ver0 == ver1 else cmp(ver0, ver1)
-        else:
-            return cmp(epoch0, epoch1)
+    >>> cmp(1, 2)
+    -1
+    >>> cmp(2, 1)
+    1
+    >>> cmp(1, 1)
+    0
+    """
+    return (lhs > rhs) - (lhs < rhs)
+
+
+def cmp_evrs(evr0, evr1):
+    """Naive alternative implementation of yum.compareEVR by comparisons of
+    epochs, versions and releases in this order.
+
+    :param evr0, evr1: Tuples of (epoch, version, release)
+    """
+    (epoch0, ver0, rel0) = evr0
+    (epoch1, ver1, rel1) = evr1
+
+    if epoch0 == epoch1:
+        return cmp(rel0, rel1) if ver0 == ver1 else cmp(ver0, ver1)
+
+    return cmp(epoch0, epoch1)
 
 
 def timestamp(dtobj=False):

@@ -134,7 +134,8 @@ def list_latest_errata_by_updates(ers):
     :param ers: A list of errata dict
     :return: A list of items in `ers` grouped by update names
     """
-    ung = lambda e: sorted(set(u["name"] for u in e.get("updates", [])))
+    ung = lambda e: sorted(set(u["name"] for u  # noqa: E731
+                           in e.get("updates", [])))
     return [xs[-1] for xs
             in fleure_db.utils.sgroupby(ers, ung, itemgetter("issued"))]
 
@@ -285,6 +286,11 @@ def list_updates_by_num_of_errata(uess):
                   reverse=True)
 
 
+def _ups_by_nes(es):
+    """list Updates by number of errata."""
+    return list_updates_by_num_of_errata(list_update_errata_pairs(es))
+
+
 def analyze_rhsa(rhsa):
     """
     Compute and return statistics of RHSAs from some view points.
@@ -305,8 +311,6 @@ def analyze_rhsa(rhsa):
                               if e["severity"] == "Low"]))]
 
     rhsa_ues = list_update_errata_pairs(rhsa)
-    _ups_by_nes = lambda es: \
-        list_updates_by_num_of_errata(list_update_errata_pairs(es))
 
     return {'list': rhsa,
             'list_critical': cri_rhsa,
@@ -333,7 +337,7 @@ def analyze_rhba(rhba, keywords=fleure_db.globals.ERRATA_KEYWORDS,
     :param core_rpms: Core RPMs to filter errata by them
     :return: RHSA analized data and metrics
     """
-    kfn = lambda e: (len(e.get("keywords", [])), e["issued"],
+    kfn = lambda e: (len(e.get("keywords", [])), e["issued"],  # noqa: E731
                      e["pkgnames"])
     rhba_by_kwds = sorted(errata_of_keywords_g(rhba, keywords, pkeywords),
                           key=kfn, reverse=True)
