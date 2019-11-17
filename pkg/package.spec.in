@@ -14,7 +14,7 @@ Source0:        %{pkgname}-%{version}.tar.gz
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
-BuildRequires:  python3-PyYAML
+BuildRequires:  python3-pyyaml
 # yum-utils is neede for yum-builddep in rhel.
 %if 0%{?rhel}
 BuildRequires:  yum-utils
@@ -27,12 +27,12 @@ BuildRequires:  yum-utils
 Summary:        Generic access to configuration files in some formats
 Group:          Development/Libraries
 Requires:       python3-Cython
-Requires:       python3-PyYAML
+Requires:       python3-pyyaml
 Requires:       python3-setuptools
 Requires:       python3-anyconfig
 Requires:       python3-setuptools
 Requires:       python3-Cython
-Requires:       python3-gensim-addons
+Requires:       python3-gensim
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
